@@ -1,11 +1,10 @@
-// lib/features/quiz/keyboard_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// ИСПРАВЛЕНИЕ: Добавляем недостающий импорт
 import 'package:greek_quiz/data/models/word.dart';
 import 'package:greek_quiz/features/quiz/keyboard_quiz_provider.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
+import 'package:greek_quiz/shared/widgets/word_display.dart';
 
 class KeyboardView extends ConsumerWidget {
   const KeyboardView({super.key});
@@ -19,6 +18,7 @@ class KeyboardView extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final state = ref.watch(keyboardQuizProvider);
     final notifier = ref.read(keyboardQuizProvider.notifier);
+    // ИСПРАВЛЕНИЕ: Теперь экран "слушает" изменения в настройках
     final settings = ref.watch(settingsProvider);
     final textTheme = Theme.of(context).textTheme;
 
@@ -27,7 +27,6 @@ class KeyboardView extends ConsumerWidget {
       return Center(child: Text(l10n.error_no_words_loaded));
     }
 
-    final questionText = _getWordField(currentWord, settings.studiedLanguage);
     final correctAnswer = _getWordField(currentWord, settings.answerLanguage);
 
     return Center(
@@ -36,18 +35,13 @@ class KeyboardView extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(questionText, style: textTheme.displaySmall, textAlign: TextAlign.center),
-            if (settings.showTranscription && currentWord.transcription.isNotEmpty)
-              Text('[${currentWord.transcription}]', style: textTheme.titleLarge?.copyWith(color: Colors.grey.shade600)),
+            WordDisplay(word: currentWord),
 
+            // ИСПРАВЛЕНИЕ: Возвращаем пример использования с правильной логикой видимости
             if (currentWord.usage_example != null && currentWord.usage_example!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(currentWord.usage_example!, style: textTheme.bodyLarge, textAlign: TextAlign.center,
-                ),
-              ),
+              _buildUsageExample(context, currentWord.usage_example!, state.status == KeyboardQuizStatus.checked),
 
-            SizedBox(height: 40, child: _buildFeedback(context, l10n, state, correctAnswer)),
+            SizedBox(height: 20, child: _buildFeedback(context, l10n, state, correctAnswer)),
 
             TextField(
               controller: notifier.textController,
@@ -76,12 +70,30 @@ class KeyboardView extends ConsumerWidget {
     );
   }
 
+  Widget _buildUsageExample(BuildContext context, String text, bool isVisible) {
+    return Visibility(
+      visible: isVisible,
+      maintainAnimation: true,
+      maintainState: true,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isVisible ? 1.0 : 0.0,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFeedback(BuildContext context, AppLocalizations l10n, KeyboardQuizState state, String correctAnswer) {
     if (state.status != KeyboardQuizStatus.checked) return const SizedBox.shrink();
-
     final text = state.isCorrect ? l10n.correct_answer_feedback : '${l10n.incorrect_answer_feedback}$correctAnswer';
     final color = state.isCorrect ? Colors.green : Theme.of(context).colorScheme.error;
-
     return Text(text, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center);
   }
 }

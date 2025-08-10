@@ -1,4 +1,3 @@
-// lib/data/models/word.dart
 import 'package:flutter/foundation.dart';
 import 'dart:core';
 
@@ -11,7 +10,8 @@ class Word {
   final String transcription;
   final String? partOfSpeech;
   final String? usage_example;
-  final String dictionaryId; // ID словаря, из которого пришло слово
+  final String dictionaryId;
+  final String? gender; // ДОБАВЛЕНО
 
   const Word({
     required this.id,
@@ -21,10 +21,10 @@ class Word {
     required this.transcription,
     this.partOfSpeech,
     this.usage_example,
-    required this.dictionaryId, // Добавлено в конструктор
+    required this.dictionaryId,
+    this.gender, // ДОБАвлено
   });
 
-  // Конструктор теперь принимает ID словаря
   factory Word.fromJson(Map<String, dynamic> json, String dictionaryId) {
     return Word(
       id: (json['el'] as String?) ?? '',
@@ -34,7 +34,8 @@ class Word {
       transcription: (json['transcription'] as String?) ?? '',
       partOfSpeech: json['part_of_speech'] as String?,
       usage_example: json['usage_example'] as String?,
-      dictionaryId: dictionaryId, // Присваиваем ID
+      dictionaryId: dictionaryId,
+      gender: json['gender'] as String?, // ДОБАВЛЕНО
     );
   }
 }

@@ -1,4 +1,3 @@
-// lib/features/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/services/dictionary_service.dart';
@@ -12,6 +11,8 @@ import 'package:greek_quiz/features/quiz/talk_show_view.dart';
 import 'package:greek_quiz/features/settings/settings_screen.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
 
+enum QuizMode { quiz, cards, keyboard, talkShow }
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -19,7 +20,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _selectedIndex = 0;
+  QuizMode _selectedMode = QuizMode.quiz;
 
   static const List<Widget> _quizViews = <Widget>[
     QuizView(),
@@ -42,6 +43,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Stack(
       children: [
         Scaffold(
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
             title: const Text('Greek Quiz'),
             actions: [
@@ -60,7 +62,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: const DictionarySelectionView(),
                     ),
                   );
-                  // ИСПРАВЛЕНИЕ: Обновляем ОБА провайдера
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
                 },
@@ -80,34 +81,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ],
           ),
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: _quizViews,
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: (index) => setState(() => _selectedIndex = index),
-            type: BottomNavigationBarType.fixed,
-            items: [
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.quiz_outlined),
-                activeIcon: const Icon(Icons.quiz),
-                label: l10n.quiz_mode_title,
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: SegmentedButton<QuizMode>(
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  segments: <ButtonSegment<QuizMode>>[
+                    ButtonSegment(value: QuizMode.quiz, label: Text(l10n.quiz_mode_title)),
+                    ButtonSegment(value: QuizMode.cards, label: Text(l10n.card_mode_title)),
+                    ButtonSegment(value: QuizMode.keyboard, label: Text(l10n.keyboard_mode_title)),
+                    ButtonSegment(value: QuizMode.talkShow, label: Text(l10n.talk_show_mode_title)),
+                  ],
+                  selected: {_selectedMode},
+                  onSelectionChanged: (Set<QuizMode> newSelection) {
+                    setState(() {
+                      _selectedMode = newSelection.first;
+                    });
+                  },
+                ),
               ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.style_outlined),
-                activeIcon: const Icon(Icons.style),
-                label: l10n.card_mode_title,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.keyboard_outlined),
-                activeIcon: const Icon(Icons.keyboard),
-                label: l10n.keyboard_mode_title,
-              ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.mic_outlined),
-                activeIcon: const Icon(Icons.mic),
-                label: l10n.talk_show_mode_title,
+              Expanded(
+                child: IndexedStack(
+                  index: _selectedMode.index,
+                  children: _quizViews,
+                ),
               ),
             ],
           ),
@@ -146,10 +147,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 extension AppLocalizationsExtension on AppLocalizations {
   String getString(String key) {
     switch (key) {
-      case 'downloading_dictionaries': return downloading_dictionaries;
-      case 'all_dictionaries_updated': return all_dictionaries_updated;
-      case 'download_error': return download_error;
-      default: return key;
+      case 'downloading_dictionaries':
+        return downloading_dictionaries;
+      case 'all_dictionaries_updated':
+        return all_dictionaries_updated;
+      case 'download_error':
+        return download_error;
+      default:
+        return key;
     }
   }
 }
