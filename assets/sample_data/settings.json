@@ -1,0 +1,175 @@
+{
+  "settings": {
+    "languages": ["ru", "en", "el"],
+    "rules": [
+      {
+        "lang_code": "ru",
+        "filePath": "https://redinger.cc/greekquiz/rules-ru.html"
+      },
+      {
+        "lang_code": "en",
+        "filePath": "https://redinger.cc/greekquiz/rules-en.html"
+      },
+      {
+        "lang_code": "el",
+        "filePath": "https://redinger.cc/greekquiz/rules-el.html"
+      }
+    ]
+  },
+  "dictionaries": [
+    {
+      "name_ru": "я/ты",
+      "name_en": "I/you",
+      "name_el": "εγώ/εσύ",
+      "filePath": "https://www.dropbox.com/scl/fi/7qwx31ulqt495fx73biwf/my_words_1.txt?rlkey=1pdnfqh6rmrj9rfl1mplq02wz&st=sm5wpiv8&raw=1",
+      "file": "wy_words_1.txt"
+    },
+    {
+      "name_ru": "мамы/папы",
+      "name_en": "moms/dads",
+      "name_el": "μητέρες/πατέρες",
+      "filePath": "https://www.dropbox.com/scl/fi/qug5ri7t0uej5n99b97kq/my_words_2.txt?rlkey=4165hdpqhpes4hnphizm4ctd1&st=6avqeq38&raw=1",
+      "file": "my_words_2.txt"
+    },
+    {
+      "name_ru": "глаголы",
+      "name_en": "verbs",
+      "name_el": "ρήματα",
+      "filePath": "https://www.dropbox.com/scl/fi/r561zs5qfk5cdrytj8dss/my_words_3.txt?rlkey=vvxmvzi8gh556f32y8t14nd5l&st=694hzick&raw=1",
+      "file": "my_words_3.txt"
+    },
+    {
+      "name_ru": "числа",
+      "name_en": "numbers",
+      "name_el": "αριθμοί",
+      "filePath": "https://www.dropbox.com/scl/fi/s4u4fipuolsti3glajuns/numbers.txt?rlkey=icjrgsian2pi6fpfruht6dbdp&st=qlnql2fu&raw=1",
+      "file": "numbers.txt"
+    },
+    {
+      "name_ru": "дни",
+      "name_en": "days",
+      "name_el": "ημέρες",
+      "filePath": "https://www.dropbox.com/scl/fi/vtovygju6ak2810qyi7u2/days.txt?rlkey=lxkf14xyi3xyixvl7ttgpjx3k&st=kujnqhga&raw=1",
+      "file": "days.txt"
+    },
+    {
+      "name_ru": "цвета",
+      "name_en": "colors",
+      "name_el": "χρώματα",
+      "filePath": "https://www.dropbox.com/scl/fi/4dejdrj5r010zw5f31ita/colors.txt?rlkey=hk7mxxjmmk4onx3419j740kmd&st=dxzxdsa9&raw=1",
+      "file": "colors.txt"
+    },
+    {
+      "name_ru": "еда",
+      "name_en": "food",
+      "name_el": "φαγητό",
+      "filePath": "https://www.dropbox.com/scl/fi/9bzodomjrurbgtdiie7c7/food.txt?rlkey=vgl887kyhb6s8esnoum0udcu3&st=ti3mgeib&raw=1",
+      "file": "food.txt"
+    },
+    {
+      "name_ru": "о людях",
+      "name_en": "about people",
+      "name_el": "για ανθρώπους",
+      "filePath": "https://www.dropbox.com/scl/fi/sla1lkml6sdvi77y1byko/p_adv.txt?rlkey=0itaz2e9cnkrlpgb159lvwe1c&st=gyaqkfsq&raw=1",
+      "file": "p_adv.txt"
+    },
+    {
+      "name_ru": "общие",
+      "name_en": "general",
+      "name_el": "γενικά",
+      "filePath": "https://www.dropbox.com/scl/fi/qe6xetoqeyiyureweojx7/objects.txt?rlkey=rkj1s4o57zmeocjfmd06e2f9y&st=3ebt2t0j&raw=1",
+      "file": "objects.txt"
+    },
+    {
+      "name_ru": "одежда",
+      "name_en": "clothes",
+      "name_el": "ρούχα",
+      "filePath": "https://www.dropbox.com/scl/fi/sj2a84ehdbj7pc6a97id6/wear.txt?rlkey=o31g9d8z4oi2x3xxp8z4wx0jd&st=cxvj4otv&raw=1",
+      "file": "wear.txt"
+    },
+    {
+      "name_ru": "тело",
+      "name_en": "body",
+      "name_el": "σώμα",
+      "filePath": "https://www.dropbox.com/scl/fi/mijnkm1seu9cif9myqtyp/body.txt?rlkey=upw9t8oov7j0alptr7gtehj5k&st=3bo3xaft&raw=1",
+      "file": "body.txt"
+    },
+    {
+      "name_ru": "союзы и пр",
+      "name_en": "conjunctions & connectors",
+      "name_el": "Σύνδεσμοι",
+      "filePath": "https://www.dropbox.com/scl/fi/hkbyhdkkklvudgmm7cx0a/.txt?rlkey=dki5jgb7w8leaojyppyhsl3ij&st=8gxs94p4&raw=1",
+      "file": "cc.txt"
+    },
+    {
+      "name_ru": "животные",
+      "name_en": "animals",
+      "name_el": "ζώα",
+      "filePath": "https://www.dropbox.com/scl/fi/cdngj2fqx68nr68harez7/animals.txt?rlkey=45dxq2xotsvssaqfrb4ami535&st=75sksw2e&raw=1",
+      "file": "animals.txt"
+    },
+    {
+      "name_ru": "работы",
+      "name_en": "jobs",
+      "name_el": "δουλειές",
+      "filePath": "https://www.dropbox.com/scl/fi/ssl53a9lb14fikun8zg41/jobs.txt?rlkey=xyeww9hmxou1t2nm2l2umzb5w&st=s2jclikp&raw=1",
+      "file": "jobs.txt"
+    },
+    {
+      "name_ru": "предметы",
+      "name_en": "household",
+      "name_el": "Οικιακά είδη",
+      "filePath": "https://www.dropbox.com/scl/fi/9mo0umbaxbw60n1rhhlbw/household.txt?rlkey=zl7kutiaxald50f1ojya3tvpg&st=5sf7kyaj&raw=1",
+      "file": "household.txt"
+    },
+    {
+      "name_ru": "дом",
+      "name_en": "house",
+      "name_el": "Σπίτι",
+      "filePath": "https://www.dropbox.com/scl/fi/1ml7qxwzo7dntialvvd9g/house.txt?rlkey=mdrbaotlq0kjt19f7vb497nk9&st=xxkp6atd&raw=1",
+      "file": "house.txt"
+    },
+    {
+      "name_ru": "вещи 1",
+      "name_en": "things 1",
+      "name_el": "Πράγμα 1",
+      "filePath": "https://www.dropbox.com/scl/fi/nvydwwqmb5aq5g1157vwz/things_1.txt?rlkey=pmrjpufj6l84idvdhzdgv19tt&st=kwsodhmq&raw=1",
+      "file": "thing_1.txt"
+    },
+    {
+      "name_ru": "сова 2",
+      "name_en": "owl 2",
+      "name_el": "Κουκουβάγια 2",
+      "filePath": "https://www.dropbox.com/scl/fi/aw56q030y4i4kn0a52ixg/owl-2.txt?rlkey=98bz4zwujpe9j6iizetj558f7&st=tmtk9tym&raw=1",
+      "file": "owl 2.txt"
+    },
+    {
+      "name_ru": "погода",
+      "name_en": "wheather",
+      "name_el": "Καιρός",
+      "filePath": "https://www.dropbox.com/scl/fi/qto7ojrfqxmyl07ajurk0/weather.txt?rlkey=m8owgptjj9tno2ce1rq6f1n3l&st=0sgwbxwv&raw=1",
+      "file": "weather.txt"
+    },
+    {
+      "name_ru": "замеры",
+      "name_en": "measure",
+      "name_el": "Μετρώ",
+      "filePath": "https://www.dropbox.com/scl/fi/qczyywqlb2j35bnv5l3ms/measure.txt?rlkey=ad1u78h9n5g0lfqagy5umfhfb&st=9nfn16s6&raw=1",
+      "file": "measure.txt"
+    },
+    {
+      "name_ru": "уроки",
+      "name_en": "lessons",
+      "name_el": "Μάθημα",
+      "filePath": "https://www.dropbox.com/scl/fi/hwk9cuo2mr20d52axipai/lessons.txt?rlkey=urdgxo3utkfdke056pdby7rap&st=94zicl71&raw=1",
+      "file": "lessons.txt"
+    },
+    {
+      "name_ru": "разное",
+      "name_en": "miscellaneous",
+      "name_el": "διάφορα",
+      "filePath": "https://www.dropbox.com/scl/fi/99fstpfekv8ikilg6c6bd/diff.txt?rlkey=47fsgz3u47405auarvj0tmpy6&st=thzjmq3k&raw=1",
+      "file": "diff.txt"
+    }
+  ]
+}
