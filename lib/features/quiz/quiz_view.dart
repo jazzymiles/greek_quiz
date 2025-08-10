@@ -4,6 +4,7 @@ import 'package:greek_quiz/data/models/word.dart';
 import 'package:greek_quiz/features/quiz/quiz_provider.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
+import 'package:greek_quiz/shared/services/tts_service.dart';
 import 'package:greek_quiz/shared/widgets/word_display.dart';
 
 class QuizView extends ConsumerWidget {
@@ -18,7 +19,6 @@ class QuizView extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final quizState = ref.watch(quizProvider);
     final notifier = ref.read(quizProvider.notifier);
-    // ИСПРАВЛЕНИЕ: Теперь экран "слушает" изменения в настройках
     final settings = ref.watch(settingsProvider);
 
     return quizState.currentWord.when(
@@ -33,13 +33,9 @@ class QuizView extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 WordDisplay(word: currentWord),
-
-                // ИСПРАВЛЕНИЕ: Возвращаем пример использования с правильной логикой видимости
                 if (currentWord.usage_example != null && currentWord.usage_example!.isNotEmpty)
                   _buildUsageExample(context, currentWord.usage_example!, quizState.showFeedback),
-
                 SizedBox(height: 20, child: _buildFeedback(context, l10n, quizState, correctAnswer)),
-
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -53,7 +49,6 @@ class QuizView extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 40),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -75,7 +70,6 @@ class QuizView extends ConsumerWidget {
     );
   }
 
-  // Виджет для примера использования
   Widget _buildUsageExample(BuildContext context, String text, bool isVisible) {
     return Visibility(
       visible: isVisible,
@@ -123,7 +117,15 @@ class QuizView extends ConsumerWidget {
         side: border,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      onPressed: state.showFeedback ? null : () => ref.read(quizProvider.notifier).selectAnswer(option),
+      onPressed: state.showFeedback
+          ? null
+          : () {
+        final settings = ref.read(settingsProvider);
+        if (settings.playAnswerSound) {
+          ref.read(ttsServiceProvider).speak(option, settings.answerLanguage);
+        }
+        ref.read(quizProvider.notifier).selectAnswer(option);
+      },
       child: Text(option, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
     );
   }

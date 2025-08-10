@@ -1,4 +1,3 @@
-// lib/features/quiz/keyboard_quiz_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/models/word.dart';
@@ -37,7 +36,6 @@ class KeyboardQuizNotifier extends StateNotifier<KeyboardQuizState> {
 
   KeyboardQuizNotifier(this._ref) : super(const KeyboardQuizState()) {
     textController = TextEditingController();
-    refresh();
   }
 
   @override
@@ -50,13 +48,8 @@ class KeyboardQuizNotifier extends StateNotifier<KeyboardQuizState> {
     return switch (langCode) { 'el' => word.el, 'en' => word.en ?? '', 'ru' => word.ru, _ => word.el };
   }
 
-  Future<void> refresh() async {
-    final dictionaryService = _ref.read(dictionaryServiceProvider);
-
-    // ИСПРАВЛЕНИЕ: Используем правильные методы
-    await dictionaryService.loadAllWordsFromDisk();
-    dictionaryService.filterActiveWords();
-
+  void refresh() {
+    _ref.read(dictionaryServiceProvider).filterActiveWords();
     generateNewQuestion();
   }
 
@@ -90,5 +83,7 @@ class KeyboardQuizNotifier extends StateNotifier<KeyboardQuizState> {
 }
 
 final keyboardQuizProvider = StateNotifierProvider.autoDispose<KeyboardQuizNotifier, KeyboardQuizState>((ref) {
-  return KeyboardQuizNotifier(ref);
+  final notifier = KeyboardQuizNotifier(ref);
+  ref.onDispose(() => notifier.dispose());
+  return notifier;
 });

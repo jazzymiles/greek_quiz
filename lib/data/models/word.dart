@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'dart:core';
 
 @immutable
 class Word {
@@ -11,7 +10,7 @@ class Word {
   final String? partOfSpeech;
   final String? usage_example;
   final String dictionaryId;
-  final String? gender; // ДОБАВЛЕНО
+  final String? gender;
 
   const Word({
     required this.id,
@@ -22,7 +21,7 @@ class Word {
     this.partOfSpeech,
     this.usage_example,
     required this.dictionaryId,
-    this.gender, // ДОБАвлено
+    this.gender,
   });
 
   factory Word.fromJson(Map<String, dynamic> json, String dictionaryId) {
@@ -35,12 +34,11 @@ class Word {
       partOfSpeech: json['part_of_speech'] as String?,
       usage_example: json['usage_example'] as String?,
       dictionaryId: dictionaryId,
-      gender: json['gender'] as String?, // ДОБАВЛЕНО
+      gender: json['gender'] as String?,
     );
   }
 }
 
-// QuizAnswer без изменений
 @immutable
 class QuizAnswer {
   final Word word;

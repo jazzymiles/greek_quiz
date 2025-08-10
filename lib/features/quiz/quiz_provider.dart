@@ -36,15 +36,11 @@ class QuizState {
 class QuizNotifier extends StateNotifier<QuizState> {
   final Ref _ref;
 
-  QuizNotifier(this._ref) : super(const QuizState()) {
-    refresh();
-  }
+  QuizNotifier(this._ref) : super(const QuizState());
 
   String _getWordField(Word word, String langCode) {
     return switch (langCode) {
-      'el' => word.el,
-      'en' => word.en ?? '',
-      'ru' => word.ru,
+      'el' => word.el, 'en' => word.en ?? '', 'ru' => word.ru,
       _ => word.el,
     };
   }
@@ -61,9 +57,7 @@ class QuizNotifier extends StateNotifier<QuizState> {
     final word = dictionaryService.getRandomWord();
 
     if (word == null) {
-      state = state.copyWith(
-          currentWord: AsyncValue.error(
-              "Выберите и скачайте словари", StackTrace.current));
+      state = state.copyWith(currentWord: AsyncValue.error("Выберите и скачайте словари", StackTrace.current));
       return;
     }
 
@@ -73,8 +67,7 @@ class QuizNotifier extends StateNotifier<QuizState> {
     );
 
     final correctAnswerText = _getWordField(word, settings.answerLanguage);
-    final options =
-    wrongOptions.map((w) => _getWordField(w, settings.answerLanguage)).toList();
+    final options = wrongOptions.map((w) => _getWordField(w, settings.answerLanguage)).toList();
     options.add(correctAnswerText);
     options.shuffle();
 
@@ -92,7 +85,6 @@ class QuizNotifier extends StateNotifier<QuizState> {
   }
 }
 
-final quizProvider =
-StateNotifierProvider.autoDispose<QuizNotifier, QuizState>((ref) {
+final quizProvider = StateNotifierProvider.autoDispose<QuizNotifier, QuizState>((ref) {
   return QuizNotifier(ref);
 });

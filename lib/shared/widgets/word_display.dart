@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/models/word.dart';
 import 'package:greek_quiz/features/settings/app_settings.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
+import 'package:greek_quiz/shared/services/tts_service.dart';
 
 class WordDisplay extends ConsumerStatefulWidget {
   final Word word;
@@ -16,25 +17,43 @@ class WordDisplay extends ConsumerStatefulWidget {
 class _WordDisplayState extends ConsumerState<WordDisplay> {
   bool _temporarilyShowTranscription = false;
 
-  String _getWordWithArticle(Word word, AppSettings settings) {
+  @override
+  void didUpdateWidget(covariant WordDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.word.id != oldWidget.word.id) {
+      _temporarilyShowTranscription = false;
+      _handleAutoplay(widget.word);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => _handleAutoplay(widget.word));
+  }
+
+  void _handleAutoplay(Word word) {
+    final settings = ref.read(settingsProvider);
+    if (settings.autoPlaySound) {
+      _speakWord(word, settings);
+    }
+  }
+
+  void _speakWord(Word word, AppSettings settings) {
+    final ttsService = ref.read(ttsServiceProvider);
+    final textToSpeak = _getQuestionText(word, settings, forTts: true);
+    ttsService.speak(textToSpeak, settings.studiedLanguage);
+  }
+
+  String _getWordWithArticle(Word word, AppSettings settings, {bool forTts = false}) {
     var question = word.el;
-    if (settings.studiedLanguage == 'el' && settings.showArticle) {
+    if (settings.studiedLanguage == 'el' && settings.showArticle && !forTts) {
       final String article;
       switch (word.gender?.toLowerCase()) {
-        case "m":
-        case "м":
-          article = "ο";
-          break;
-        case "f":
-        case "ж":
-          article = "η";
-          break;
-        case "n":
-        case "ср":
-          article = "το";
-          break;
-        default:
-          article = "";
+        case "m": case "м": article = "ο"; break;
+        case "f": case "ж": article = "η"; break;
+        case "n": case "ср": article = "το"; break;
+        default: article = "";
       }
       if (article.isNotEmpty) {
         question = '$article $question';
@@ -43,22 +62,13 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
     return question;
   }
 
-  String _getQuestionText(Word word, AppSettings settings) {
+  String _getQuestionText(Word word, AppSettings settings, {bool forTts = false}) {
     return switch (settings.studiedLanguage) {
-      'el' => _getWordWithArticle(word, settings),
+      'el' => _getWordWithArticle(word, settings, forTts: forTts),
       'en' => word.en ?? '',
       'ru' => word.ru,
-      _ => _getWordWithArticle(word, settings),
+      _ => _getWordWithArticle(word, settings, forTts: forTts),
     };
-  }
-
-  // Сбрасываем временный показ при смене слова
-  @override
-  void didUpdateWidget(covariant WordDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.word.id != oldWidget.word.id) {
-      _temporarilyShowTranscription = false;
-    }
   }
 
   @override
@@ -73,7 +83,16 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
 
     return Column(
       children: [
-        Text(questionText, style: textTheme.displaySmall, textAlign: TextAlign.center),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Flexible(child: Text(questionText, style: textTheme.displaySmall, textAlign: TextAlign.center)),
+            IconButton(
+              icon: Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
+              onPressed: () => _speakWord(word, settings),
+            )
+          ],
+        ),
         if (hasTranscription)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),

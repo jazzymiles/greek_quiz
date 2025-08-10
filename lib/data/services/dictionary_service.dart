@@ -1,14 +1,13 @@
-// lib/data/services/dictionary_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/models/dictionary_info.dart';
 import 'package:greek_quiz/data/models/word.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import 'package:greek_quiz/features/settings/settings_provider.dart';
 
 class DictionaryService extends ChangeNotifier {
   List<Word> activeWords = [];
@@ -17,7 +16,6 @@ class DictionaryService extends ChangeNotifier {
   bool isDownloading = false;
   double downloadProgress = 0.0;
   String statusMessage = "";
-
   List<Word> _allLoadedWords = [];
   final Random _random = Random();
   bool _isInitialized = false;
@@ -51,7 +49,6 @@ class DictionaryService extends ChangeNotifier {
         try {
           final jsonString = await file.readAsString();
           final List<dynamic> jsonList = json.decode(jsonString);
-          // ИЗМЕНЕНИЕ: При парсинге передаем ID словаря (dictInfo.file)
           _allLoadedWords.addAll(jsonList.map((json) => Word.fromJson(json, dictInfo.file)));
         } catch(e) {
           print("Ошибка парсинга файла ${dictInfo.file}: $e");
@@ -61,16 +58,14 @@ class DictionaryService extends ChangeNotifier {
     print("Всего загружено с диска ${_allLoadedWords.length} слов.");
   }
 
-  // ИЗМЕНЕНИЕ: Логика фильтрации теперь работает правильно
   void filterActiveWords() {
     activeWords.clear();
     if (selectedDictionaries.isEmpty) {
       print("Словари не выбраны, активных слов нет.");
-      notifyListeners(); // Уведомляем, что список пуст
+      notifyListeners();
       return;
     }
 
-    // Фильтруем слова, чей ID словаря есть в списке выбранных
     activeWords = _allLoadedWords
         .where((word) => selectedDictionaries.contains(word.dictionaryId))
         .toList();
@@ -79,9 +74,6 @@ class DictionaryService extends ChangeNotifier {
     activeWords.shuffle(_random);
     notifyListeners();
   }
-
-  // ... остальные методы (fetch, download, getRandomWord и т.д.) без изменений ...
-  // ... (здесь полный код остальных методов для ясности)
 
   Future<void> fetchAvailableDictionaries() async {
     if (availableDictionaries.isNotEmpty) return;
@@ -111,7 +103,6 @@ class DictionaryService extends ChangeNotifier {
     statusMessage = "downloading_dictionaries";
     downloadProgress = 0.0;
     notifyListeners();
-
     try {
       final Directory supportDir = await getApplicationSupportDirectory();
       final dictionariesDir = Directory('${supportDir.path}/DownloadedDictionaries');
@@ -123,7 +114,6 @@ class DictionaryService extends ChangeNotifier {
         statusMessage = dictInfo.getLocalizedName(interfaceLanguage);
         downloadProgress = (i + 1) / total;
         notifyListeners();
-
         final response = await http.get(Uri.parse(dictInfo.filePath));
         if (response.statusCode == 200) {
           final file = File('${dictionariesDir.path}/${dictInfo.file}');
@@ -133,10 +123,8 @@ class DictionaryService extends ChangeNotifier {
       }
       statusMessage = "all_dictionaries_updated";
       notifyListeners();
-
       await loadAllWordsFromDisk();
       filterActiveWords();
-
     } catch (e) {
       statusMessage = "download_error";
       notifyListeners();
@@ -163,7 +151,6 @@ class DictionaryService extends ChangeNotifier {
   }
 }
 
-// Провайдеры без изменений
 final dictionaryServiceProvider = ChangeNotifierProvider<DictionaryService>((ref) {
   return DictionaryService();
 });

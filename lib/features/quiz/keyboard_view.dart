@@ -18,9 +18,7 @@ class KeyboardView extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final state = ref.watch(keyboardQuizProvider);
     final notifier = ref.read(keyboardQuizProvider.notifier);
-    // ИСПРАВЛЕНИЕ: Теперь экран "слушает" изменения в настройках
     final settings = ref.watch(settingsProvider);
-    final textTheme = Theme.of(context).textTheme;
 
     final currentWord = state.currentWord;
     if (currentWord == null) {
@@ -36,31 +34,24 @@ class KeyboardView extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             WordDisplay(word: currentWord),
-
-            // ИСПРАВЛЕНИЕ: Возвращаем пример использования с правильной логикой видимости
             if (currentWord.usage_example != null && currentWord.usage_example!.isNotEmpty)
               _buildUsageExample(context, currentWord.usage_example!, state.status == KeyboardQuizStatus.checked),
-
             SizedBox(height: 20, child: _buildFeedback(context, l10n, state, correctAnswer)),
-
             TextField(
               controller: notifier.textController,
               decoration: InputDecoration(labelText: l10n.your_translation_placeholder),
               enabled: state.status == KeyboardQuizStatus.asking,
             ),
             const SizedBox(height: 30),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 if (state.status == KeyboardQuizStatus.checked)
                   FilledButton(onPressed: notifier.showAnswer, child: Text(l10n.show_answer_button)),
-
                 FilledButton(
                   onPressed: state.status == KeyboardQuizStatus.asking ? notifier.checkAnswer : null,
                   child: Text(l10n.check_button),
                 ),
-
                 FilledButton(onPressed: notifier.generateNewQuestion, child: Text(l10n.next_button)),
               ],
             )

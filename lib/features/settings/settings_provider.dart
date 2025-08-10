@@ -1,6 +1,4 @@
-// lib/features/settings/settings_provider.dart
 import 'package:flutter/material.dart';
-// ИСПРАВЛЕНИЕ: Правильный импорт
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/features/settings/app_settings.dart';
 

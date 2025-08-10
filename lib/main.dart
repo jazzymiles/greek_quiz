@@ -1,15 +1,18 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/features/home/home_screen.dart';
 import 'package:greek_quiz/features/settings/app_settings.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
-
-// ИЗМЕНЕНИЕ: Заменяем старый импорт на правильный относительный путь
 import 'package:greek_quiz/l10n/app_localizations.dart';
+import 'package:audio_session/audio_session.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final session = await AudioSession.instance;
+  // ИЗМЕНЕНИЕ: Используем более простую и стандартную конфигурацию
+  await session.configure(const AudioSessionConfiguration.music());
+
   runApp(const ProviderScope(child: MyApp()));
 }
 
