@@ -10,8 +10,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final session = await AudioSession.instance;
-  // ИЗМЕНЕНИЕ: Используем более простую и стандартную конфигурацию
   await session.configure(const AudioSessionConfiguration.music());
+  await session.setActive(true);
 
   runApp(const ProviderScope(child: MyApp()));
 }
