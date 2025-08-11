@@ -6,19 +6,48 @@ import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
 import 'package:greek_quiz/shared/widgets/word_display.dart';
 
-class KeyboardView extends ConsumerWidget {
+class KeyboardView extends ConsumerStatefulWidget {
   const KeyboardView({super.key});
+
+  @override
+  ConsumerState<KeyboardView> createState() => _KeyboardView();
+}
+
+class _KeyboardView extends ConsumerState<KeyboardView> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        FocusScope.of(context).requestFocus(_focusNode);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   String _getWordField(Word word, String langCode) {
     return switch (langCode) { 'el' => word.el, 'en' => word.en ?? '', 'ru' => word.ru, _ => word.el };
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final state = ref.watch(keyboardQuizProvider);
     final notifier = ref.read(keyboardQuizProvider.notifier);
     final settings = ref.watch(settingsProvider);
+
+    ref.listen<KeyboardQuizState>(keyboardQuizProvider, (previous, next) {
+      if (next.status == KeyboardQuizStatus.asking && previous?.status == KeyboardQuizStatus.checked) {
+        FocusScope.of(context).requestFocus(_focusNode);
+      }
+    });
 
     final currentWord = state.currentWord;
     if (currentWord == null) {
@@ -29,54 +58,63 @@ class KeyboardView extends ConsumerWidget {
     final studyExample = currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
     final answerExample = currentWord.getUsageExampleForLanguage(settings.answerLanguage);
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            WordDisplay(word: currentWord),
+    final bool isAnswerChecked = state.status == KeyboardQuizStatus.checked;
+    final String buttonText = isAnswerChecked ? l10n.next_button : l10n.check_button;
+    final VoidCallback? onPressedAction;
+    final isButtonEnabled = notifier.textController.text.trim().isNotEmpty;
 
-            _buildFeedback(context, l10n, state, correctAnswer),
+    if (isAnswerChecked) {
+      onPressedAction = notifier.generateNewQuestion;
+    } else {
+      onPressedAction = isButtonEnabled ? notifier.checkAnswer : null;
+    }
 
-            if (studyExample != null && studyExample.isNotEmpty)
-              _buildUsageExample(
-                  context: context,
-                  studyExample: studyExample,
-                  answerExample: answerExample,
-                  isVisible: state.status == KeyboardQuizStatus.checked
-              ),
-
-            const SizedBox(height: 20),
-
-            TextField(
-              controller: notifier.textController,
-              decoration: InputDecoration(labelText: l10n.your_translation_placeholder),
-              enabled: state.status == KeyboardQuizStatus.asking,
-              onSubmitted: (_) {
-                if (state.status == KeyboardQuizStatus.asking) {
-                  notifier.checkAnswer();
-                }
-              },
-            ),
-            const SizedBox(height: 30),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          WordDisplay(word: currentWord),
+          Container(
+            height: 120,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (state.status == KeyboardQuizStatus.checked)
-                  FilledButton(onPressed: notifier.showAnswer, child: Text(l10n.show_answer_button)),
-
-                FilledButton(
-                  onPressed: state.status == KeyboardQuizStatus.asking ? notifier.checkAnswer : null,
-                  child: Text(l10n.check_button),
-                ),
-
-                FilledButton(onPressed: notifier.generateNewQuestion, child: Text(l10n.next_button)),
+                _buildFeedback(context, l10n, state, correctAnswer),
+                if (studyExample != null && studyExample.isNotEmpty)
+                  _buildUsageExample(
+                      context: context,
+                      studyExample: studyExample,
+                      answerExample: answerExample,
+                      isVisible: isAnswerChecked
+                  ),
               ],
-            )
-          ],
-        ),
+            ),
+          ),
+          TextField(
+            focusNode: _focusNode,
+            controller: notifier.textController,
+            decoration: InputDecoration(labelText: l10n.your_translation_placeholder),
+            enabled: !isAnswerChecked,
+            onChanged: (text) => setState(() {}),
+            onSubmitted: (_) {
+              if (isButtonEnabled && !isAnswerChecked) {
+                onPressedAction!();
+              }
+            },
+          ),
+          const SizedBox(height: 40),
+          SizedBox(
+            width: 250,
+            height: 50,
+            child: FilledButton(
+              onPressed: onPressedAction,
+              child: Text(buttonText),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -120,7 +158,7 @@ class KeyboardView extends ConsumerWidget {
   }
 
   Widget _buildFeedback(BuildContext context, AppLocalizations l10n, KeyboardQuizState state, String correctAnswer) {
-    if (state.status != KeyboardQuizStatus.checked) return const SizedBox(height: 20);
+    if (state.status != KeyboardQuizStatus.checked) return const SizedBox.shrink();
     final text = state.isCorrect ? l10n.correct_answer_feedback : correctAnswer;
     final color = state.isCorrect ? Colors.green : Theme.of(context).colorScheme.error;
     return Padding(
