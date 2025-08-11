@@ -8,9 +8,12 @@ class Word {
   final String? en;
   final String transcription;
   final String? partOfSpeech;
-  final String? usage_example;
   final String dictionaryId;
   final String? gender;
+
+  final String? ruExample;
+  final String? elExample;
+  final String? enExample;
 
   const Word({
     required this.id,
@@ -19,9 +22,11 @@ class Word {
     this.en,
     required this.transcription,
     this.partOfSpeech,
-    this.usage_example,
     required this.dictionaryId,
     this.gender,
+    this.ruExample,
+    this.elExample,
+    this.enExample,
   });
 
   factory Word.fromJson(Map<String, dynamic> json, String dictionaryId) {
@@ -32,10 +37,21 @@ class Word {
       en: json['en'] as String?,
       transcription: (json['transcription'] as String?) ?? '',
       partOfSpeech: json['part_of_speech'] as String?,
-      usage_example: json['usage_example'] as String?,
       dictionaryId: dictionaryId,
       gender: json['gender'] as String?,
+      ruExample: json['ru_example'] as String?,
+      elExample: json['el_example'] as String?,
+      enExample: json['en_example'] as String?,
     );
+  }
+
+  String? getUsageExampleForLanguage(String langCode) {
+    return switch (langCode) {
+      'ru' => ruExample,
+      'el' => elExample,
+      'en' => enExample,
+      _ => elExample,
+    };
   }
 }
 

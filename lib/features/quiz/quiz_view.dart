@@ -26,51 +26,82 @@ class QuizView extends ConsumerWidget {
       error: (error, stack) => Center(child: Text(error.toString(), textAlign: TextAlign.center)),
       data: (currentWord) {
         final correctAnswer = _getWordField(currentWord, settings.answerLanguage);
-        return Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                WordDisplay(word: currentWord),
-                if (currentWord.usage_example != null && currentWord.usage_example!.isNotEmpty)
-                  _buildUsageExample(context, currentWord.usage_example!, quizState.showFeedback),
-                SizedBox(height: 20, child: _buildFeedback(context, l10n, quizState, correctAnswer)),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 2.8,
-                  ),
-                  itemCount: quizState.options.length,
-                  itemBuilder: (context, index) {
-                    final option = quizState.options[index];
-                    return _buildOptionButton(context, ref, option, quizState, correctAnswer);
-                  },
-                ),
-                const SizedBox(height: 40),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        final studyExample = currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
+        final answerExample = currentWord.getUsageExampleForLanguage(settings.answerLanguage);
+
+        // --- Логика для одной кнопки ---
+        final bool isAnswerChecked = quizState.showFeedback;
+        final bool isAnswerSelected = quizState.selectedAnswer != null;
+
+        final String buttonText = isAnswerChecked ? l10n.next_button : l10n.check_button;
+        final VoidCallback? onPressedAction;
+
+        if (isAnswerChecked) {
+          onPressedAction = notifier.generateNewQuestion;
+        } else {
+          onPressedAction = isAnswerSelected ? notifier.checkAnswer : null;
+        }
+        // ---------------------------------
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              const SizedBox(height: 10),
+              WordDisplay(word: currentWord),
+              Container(
+                height: 120,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    FilledButton(
-                      onPressed: quizState.selectedAnswer != null && !quizState.showFeedback ? notifier.checkAnswer : null,
-                      child: Text(l10n.check_button),
-                    ),
-                    FilledButton(
-                      onPressed: notifier.generateNewQuestion,
-                      child: Text(l10n.next_button),
-                    ),
+                    _buildFeedback(context, l10n, quizState, correctAnswer),
+                    if (studyExample != null && studyExample.isNotEmpty)
+                      _buildUsageExample(
+                          context: context,
+                          studyExample: studyExample,
+                          answerExample: answerExample,
+                          isVisible: quizState.showFeedback
+                      ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 2.8,
+                ),
+                itemCount: quizState.options.length,
+                itemBuilder: (context, index) {
+                  final option = quizState.options[index];
+                  return _buildOptionButton(context, ref, option, quizState, correctAnswer);
+                },
+              ),
+              const SizedBox(height: 40),
+
+              SizedBox(
+                width: 250,
+                height: 50,
+                child: FilledButton(
+                  onPressed: onPressedAction,
+                  child: Text(buttonText),
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildUsageExample(BuildContext context, String text, bool isVisible) {
+  Widget _buildUsageExample({
+    required BuildContext context,
+    required String studyExample,
+    String? answerExample,
+    required bool isVisible
+  }) {
     return Visibility(
       visible: isVisible,
       maintainAnimation: true,
@@ -79,11 +110,24 @@ class QuizView extends ConsumerWidget {
         duration: const Duration(milliseconds: 300),
         opacity: isVisible ? 1.0 : 0.0,
         child: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
-            textAlign: TextAlign.center,
+          padding: const EdgeInsets.only(top: 16.0),
+          child: Column(
+            children: [
+              Text(
+                studyExample,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+                textAlign: TextAlign.center,
+              ),
+              if (answerExample != null && answerExample.isNotEmpty && answerExample != studyExample)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    answerExample,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -93,9 +137,12 @@ class QuizView extends ConsumerWidget {
   Widget _buildFeedback(BuildContext context, AppLocalizations l10n, QuizState state, String correctAnswer) {
     if (!state.showFeedback || state.selectedAnswer == null) return const SizedBox.shrink();
     final isCorrect = state.selectedAnswer == correctAnswer;
-    final text = isCorrect ? l10n.correct_answer_feedback : '${l10n.incorrect_answer_feedback}$correctAnswer';
+    final text = isCorrect ? l10n.correct_answer_feedback : correctAnswer;
     final color = isCorrect ? Colors.green : Theme.of(context).colorScheme.error;
-    return Text(text, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(text, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+    );
   }
 
   Widget _buildOptionButton(BuildContext context, WidgetRef ref, String option, QuizState state, String correctAnswer) {

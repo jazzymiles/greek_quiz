@@ -26,6 +26,8 @@ class KeyboardView extends ConsumerWidget {
     }
 
     final correctAnswer = _getWordField(currentWord, settings.answerLanguage);
+    final studyExample = currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
+    final answerExample = currentWord.getUsageExampleForLanguage(settings.answerLanguage);
 
     return Center(
       child: SingleChildScrollView(
@@ -34,24 +36,42 @@ class KeyboardView extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             WordDisplay(word: currentWord),
-            if (currentWord.usage_example != null && currentWord.usage_example!.isNotEmpty)
-              _buildUsageExample(context, currentWord.usage_example!, state.status == KeyboardQuizStatus.checked),
-            SizedBox(height: 20, child: _buildFeedback(context, l10n, state, correctAnswer)),
+
+            _buildFeedback(context, l10n, state, correctAnswer),
+
+            if (studyExample != null && studyExample.isNotEmpty)
+              _buildUsageExample(
+                  context: context,
+                  studyExample: studyExample,
+                  answerExample: answerExample,
+                  isVisible: state.status == KeyboardQuizStatus.checked
+              ),
+
+            const SizedBox(height: 20),
+
             TextField(
               controller: notifier.textController,
               decoration: InputDecoration(labelText: l10n.your_translation_placeholder),
               enabled: state.status == KeyboardQuizStatus.asking,
+              onSubmitted: (_) {
+                if (state.status == KeyboardQuizStatus.asking) {
+                  notifier.checkAnswer();
+                }
+              },
             ),
             const SizedBox(height: 30),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 if (state.status == KeyboardQuizStatus.checked)
                   FilledButton(onPressed: notifier.showAnswer, child: Text(l10n.show_answer_button)),
+
                 FilledButton(
                   onPressed: state.status == KeyboardQuizStatus.asking ? notifier.checkAnswer : null,
                   child: Text(l10n.check_button),
                 ),
+
                 FilledButton(onPressed: notifier.generateNewQuestion, child: Text(l10n.next_button)),
               ],
             )
@@ -61,7 +81,12 @@ class KeyboardView extends ConsumerWidget {
     );
   }
 
-  Widget _buildUsageExample(BuildContext context, String text, bool isVisible) {
+  Widget _buildUsageExample({
+    required BuildContext context,
+    required String studyExample,
+    String? answerExample,
+    required bool isVisible
+  }) {
     return Visibility(
       visible: isVisible,
       maintainAnimation: true,
@@ -70,11 +95,24 @@ class KeyboardView extends ConsumerWidget {
         duration: const Duration(milliseconds: 300),
         opacity: isVisible ? 1.0 : 0.0,
         child: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
-            textAlign: TextAlign.center,
+          padding: const EdgeInsets.only(top: 16.0),
+          child: Column(
+            children: [
+              Text(
+                studyExample,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+                textAlign: TextAlign.center,
+              ),
+              if (answerExample != null && answerExample.isNotEmpty && answerExample != studyExample)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    answerExample,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -82,9 +120,12 @@ class KeyboardView extends ConsumerWidget {
   }
 
   Widget _buildFeedback(BuildContext context, AppLocalizations l10n, KeyboardQuizState state, String correctAnswer) {
-    if (state.status != KeyboardQuizStatus.checked) return const SizedBox.shrink();
-    final text = state.isCorrect ? l10n.correct_answer_feedback : '${l10n.incorrect_answer_feedback}$correctAnswer';
+    if (state.status != KeyboardQuizStatus.checked) return const SizedBox(height: 20);
+    final text = state.isCorrect ? l10n.correct_answer_feedback : correctAnswer;
     final color = state.isCorrect ? Colors.green : Theme.of(context).colorScheme.error;
-    return Text(text, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(text, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+    );
   }
 }
