@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/services/dictionary_service.dart';
 import 'package:greek_quiz/features/dictionary/dictionary_selection_view.dart';
+import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
 import 'package:greek_quiz/features/quiz/card_view.dart';
 import 'package:greek_quiz/features/quiz/keyboard_quiz_provider.dart';
 import 'package:greek_quiz/features/quiz/keyboard_view.dart';
@@ -32,13 +33,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // ИЗМЕНЕНИЕ: Запускаем полную цепочку инициализации
     Future.microtask(() async {
-      // Сначала ждем, пока сервис загрузит все данные
       await ref.read(dictionaryServiceProvider).initialize();
-      // И только потом просим провайдеры квизов обновиться
+      // После инициализации обновляем все режимы
       ref.read(quizProvider.notifier).refresh();
       ref.read(keyboardQuizProvider.notifier).refresh();
+      ref.read(cardModeProvider.notifier).refresh();
     });
   }
 
@@ -61,14 +61,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
-                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
                     builder: (context) => SizedBox(
                       height: MediaQuery.of(context).size.height * 0.6,
                       child: const DictionarySelectionView(),
                     ),
                   );
+                  // ИСПРАВЛЕНИЕ: Обновляем ВСЕ ТРИ провайдера
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
+                  ref.read(cardModeProvider.notifier).refresh();
                 },
               ),
               IconButton(
@@ -92,7 +96,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: SegmentedButton<QuizMode>(
                   showSelectedIcon: false,
-                  style: SegmentedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12)),
+                  style: SegmentedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
                   segments: <ButtonSegment<QuizMode>>[
                     ButtonSegment(value: QuizMode.quiz, label: Text(l10n.quiz_mode_title)),
                     ButtonSegment(value: QuizMode.cards, label: Text(l10n.card_mode_title)),
@@ -150,10 +156,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 extension AppLocalizationsExtension on AppLocalizations {
   String getString(String key) {
     switch (key) {
-      case 'downloading_dictionaries': return downloading_dictionaries;
-      case 'all_dictionaries_updated': return all_dictionaries_updated;
-      case 'download_error': return download_error;
-      default: return key;
+      case 'downloading_dictionaries':
+        return downloading_dictionaries;
+      case 'all_dictionaries_updated':
+        return all_dictionaries_updated;
+      case 'download_error':
+        return download_error;
+      default:
+        return key;
     }
   }
 }
