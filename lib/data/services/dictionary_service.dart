@@ -86,9 +86,12 @@ class DictionaryService extends ChangeNotifier {
         availableDictionaries = dictionariesList
             .map((json) => DictionaryInfo.fromJson(json as Map<String, dynamic>))
             .toList();
-        if (availableDictionaries.isNotEmpty && selectedDictionaries.isEmpty) {
-          selectedDictionaries.add(availableDictionaries.first.file);
-        }
+
+        // ВАЖНО: ничего не выбираем автоматически.
+        // selectedDictionaries остаётся пустым, пока пользователь сам не выберет.
+        // if (availableDictionaries.isNotEmpty && selectedDictionaries.isEmpty) {
+        //   selectedDictionaries.add(availableDictionaries.first.file);
+        // }
       } else {
         throw Exception('Failed to load settings from server');
       }

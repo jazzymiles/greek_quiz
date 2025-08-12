@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:greek_quiz/data/services/dictionary_service.dart';
 import 'package:greek_quiz/features/dictionary/dictionary_selection_view.dart';
 import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
@@ -21,6 +23,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const _prefsDownloadedKey = 'dicts_installed_v1';
+
   QuizMode _selectedMode = QuizMode.quiz;
 
   static const List<Widget> _quizViews = <Widget>[
@@ -34,30 +38,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
 
-    // Зафиксируем стартовый режим в провайдере
+    // зафиксируем стартовый режим (важно для TalkShow/Keyboard)
     Future.microtask(() {
       ref.read(quizModeProvider.notifier).state = _selectedMode;
     });
 
-    // Инициализация + автозагрузка словарей при первом запуске
+    // Инициализация + ОДНОКРАТНАЯ автозагрузка (только если есть выбранные словари)
     Future.microtask(() async {
       final service = ref.read(dictionaryServiceProvider);
       final settings = ref.read(settingsProvider);
 
-      // 1) Инициализация (чтение локальных словарей/индексов)
+      // 1) Инициализация локальных данных
       await service.initialize();
 
-      // 2) Обновим режимы, чтобы подхватили локальные данные (если они есть)
+      // 2) Обновим режимы — подхватить локальные данные, если есть
       ref.read(quizProvider.notifier).refresh();
       ref.read(keyboardQuizProvider.notifier).refresh();
       ref.read(cardModeProvider.notifier).refresh();
 
-      // 3) Если активных слов нет — первый запуск: качаем словари
-      final hasWords = ref.read(cardModeProvider).activeWords.isNotEmpty;
-      if (!hasWords) {
+      // 3) Проверим, качали ли уже когда-нибудь словари
+      final prefs = await SharedPreferences.getInstance();
+      final alreadyInstalled = prefs.getBool(_prefsDownloadedKey) ?? false;
+
+      // 4) Если пользователь НЕ выбрал словари — НИЧЕГО не качаем автоматически
+      final hasSelection = service.selectedDictionaries.isNotEmpty;
+
+      // 5) Автоскачивание только один раз и только при наличии выбора
+      if (!alreadyInstalled && hasSelection) {
         await service.downloadAndSaveDictionaries(settings.interfaceLanguage);
 
-        // 4) После загрузки — снова обновляем режимы
+        // 6) Отметим, что словари уже установлены — чтобы не качать на каждом запуске
+        await prefs.setBool(_prefsDownloadedKey, true);
+
+        // 7) После загрузки обновим режимы ещё раз
         ref.read(quizProvider.notifier).refresh();
         ref.read(keyboardQuizProvider.notifier).refresh();
         ref.read(cardModeProvider.notifier).refresh();
@@ -105,7 +118,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: const DictionarySelectionView(),
                     ),
                   );
-                  // Обновляем все три провайдера после изменения словарей
+
+                  // После изменения выбора — просто обновляем провайдеры.
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
                   ref.read(cardModeProvider.notifier).refresh();
@@ -133,7 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     setState(() {
                       _selectedMode = newSelection.first;
                     });
-                    // уведомляем о смене режима (важно для TalkShow)
+                    // уведомим о смене режима (важно для TalkShow/Keyboard)
                     ref.read(quizModeProvider.notifier).state = _selectedMode;
                   },
                 ),
@@ -153,7 +167,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Center(
               child: Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(24.0), // <-- фикс: именованный параметр
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
