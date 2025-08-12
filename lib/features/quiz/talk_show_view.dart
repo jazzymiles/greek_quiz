@@ -26,7 +26,7 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Если виджет создан, но режим уже не talkShow — сразу глушим всё.
+    // если виджет создан, но режим уже не talkShow — сразу глушим всё
     if (ref.read(quizModeProvider) != QuizMode.talkShow) {
       _forceStopAll();
     }
@@ -41,7 +41,7 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
 
   @override
   void deactivate() {
-    // В IndexedStack виджет может стать невидимым, но не уничтоженным — выключаемся.
+    // в IndexedStack виджет может стать невидимым, но не уничтоженным — выключаемся
     _forceStopAll();
     super.deactivate();
   }
@@ -76,6 +76,32 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
     await ref.read(ttsServiceProvider).stop();
   }
 
+  /// Возвращает текст для *конкретного языка* с учётом артикля (только для греческого вопроса)
+  String _textWithArticle(Word word, String langCode, {required bool includeArticle}) {
+    String base = switch (langCode) {
+      'el' => word.el,
+      'en' => word.en ?? '',
+      'ru' => word.ru,
+      _ => word.el,
+    };
+
+    if (includeArticle && langCode == 'el') {
+      final g = (word.gender ?? '').toLowerCase();
+      String article = '';
+      if (g == 'm' || g == 'м') {
+        article = 'ο';
+      } else if (g == 'f' || g == 'ж') {
+        article = 'η';
+      } else if (g == 'n' || g == 'ср') {
+        article = 'το';
+      }
+      if (article.isNotEmpty) {
+        base = '$article $base';
+      }
+    }
+    return base;
+  }
+
   Future<void> _runPlaybackCycle() async {
     if (_cycleRunning) return;
     _cycleRunning = true;
@@ -98,15 +124,25 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
         final notifier = ref.read(cardModeProvider.notifier);
         final currentWord = cardState.activeWords[cardState.currentIndex];
 
-        final questionText = _getWordField(currentWord, settings.studiedLanguage);
-        await ttsService.speak(questionText, settings.studiedLanguage);
+        // вопрос — studiedLanguage, учитываем артикль если включено
+        final qText = _textWithArticle(
+          currentWord,
+          settings.studiedLanguage,
+          includeArticle: settings.showArticle,
+        );
+        await ttsService.speak(qText, settings.studiedLanguage);
         if (!_isPlaying || _isDisposed) break;
 
         await Future.delayed(const Duration(seconds: 2));
         if (!_isPlaying || _isDisposed) break;
 
-        final answerText = _getWordField(currentWord, settings.answerLanguage);
-        await ttsService.speak(answerText, settings.answerLanguage);
+        // ответ — answerLanguage, БЕЗ артикля
+        final aText = _textWithArticle(
+          currentWord,
+          settings.answerLanguage,
+          includeArticle: false,
+        );
+        await ttsService.speak(aText, settings.answerLanguage);
         if (!_isPlaying || _isDisposed) break;
 
         await Future.delayed(const Duration(seconds: 2));
@@ -133,27 +169,13 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
     }
   }
 
-  String _getWordField(Word word, String langCode) {
-    switch (langCode) {
-      case 'el':
-        return word.el ?? '';
-      case 'en':
-        return word.en ?? '';
-      case 'ru':
-        return word.ru ?? '';
-      default:
-        return word.el ?? '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Слушаем смену режима — нельзя делать это в initState для вашей версии Riverpod
+    // слушаем смену режима — в этой версии Riverpod делаем это в build()
     ref.listen<QuizMode>(
       quizModeProvider,
           (prev, mode) {
         if (mode != QuizMode.talkShow) {
-          // чтобы не ловить "setState during build", выполняем в микро-задаче
           Future.microtask(_forceStopAll);
         }
       },
@@ -169,10 +191,22 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
     }
 
     final currentWord = cardState.activeWords[cardState.currentIndex];
-    final questionText = _getWordField(currentWord, settings.studiedLanguage);
-    final answerText = _getWordField(currentWord, settings.answerLanguage);
-    final studyExample = currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
-    final answerExample = currentWord.getUsageExampleForLanguage(settings.answerLanguage);
+
+    final questionText = _textWithArticle(
+      currentWord,
+      settings.studiedLanguage,
+      includeArticle: settings.showArticle,
+    );
+    final answerText = _textWithArticle(
+      currentWord,
+      settings.answerLanguage,
+      includeArticle: false,
+    );
+
+    final studyExample =
+    currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
+    final answerExample =
+    currentWord.getUsageExampleForLanguage(settings.answerLanguage);
     final textTheme = Theme.of(context).textTheme;
 
     return Column(
@@ -200,12 +234,15 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
                         IconButton(
                           icon: Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
                           onPressed: () {
-                            ref.read(ttsServiceProvider).speak(questionText, settings.studiedLanguage);
+                            ref.read(ttsServiceProvider).speak(
+                              questionText,
+                              settings.studiedLanguage,
+                            );
                           },
                         )
                       ],
                     ),
-                    if ((currentWord.transcription ?? '').isNotEmpty)
+                    if ((currentWord.transcription).isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
@@ -226,10 +263,13 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
                           children: [
                             Text(
                               studyExample,
-                              style: textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+                              style: textTheme.bodyLarge?.copyWith(
+                                  fontStyle: FontStyle.italic, color: Colors.grey.shade700),
                               textAlign: TextAlign.center,
                             ),
-                            if (answerExample != null && answerExample.isNotEmpty && answerExample != studyExample)
+                            if (answerExample != null &&
+                                answerExample.isNotEmpty &&
+                                answerExample != studyExample)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Text(

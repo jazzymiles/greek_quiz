@@ -23,58 +23,49 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
   bool _temporarilyShowTranscription = false;
 
   @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => _handleAutoplay(widget.word));
-  }
-
-  @override
-  void didUpdateWidget(covariant WordDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.word.id != oldWidget.word.id) {
-      _temporarilyShowTranscription = false;
-      _handleAutoplay(widget.word);
-    }
-  }
-
-  void _handleAutoplay(Word word) {
-    if (!widget.autoplayEnabled) return;
-
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // автоплей вопроса, если включено
     final settings = ref.read(settingsProvider);
-    if (settings.autoPlaySound) {
-      _speakWord(word, settings);
+    if (widget.autoplayEnabled && settings.autoPlaySound) {
+      final text = _questionText(widget.word, settings);
+      ref.read(ttsServiceProvider).speak(text, settings.studiedLanguage);
     }
   }
 
-  void _speakWord(Word word, AppSettings settings) {
-    final ttsService = ref.read(ttsServiceProvider);
-    final textToSpeak = _getQuestionText(word, settings, forTts: true);
-    ttsService.speak(textToSpeak, settings.studiedLanguage);
-  }
+  /// Текст вопроса (studiedLanguage) с учётом "показывать артикли"
+  String _questionText(Word w, AppSettings settings) {
+    String base = switch (settings.studiedLanguage) {
+      'el' => w.el,
+      'ru' => w.ru,
+      'en' => w.en ?? '',
+      _ => w.el,
+    };
 
-  String _getWordWithArticle(Word word, AppSettings settings, {bool forTts = false}) {
-    var question = word.el;
-    if (settings.studiedLanguage == 'el' && settings.showArticle && !forTts) {
-      final String article;
-      switch (word.gender?.toLowerCase()) {
-        case "m": case "м": article = "ο"; break;
-        case "f": case "ж": article = "η"; break;
-        case "n": case "ср": article = "το"; break;
-        default: article = "";
+    if (settings.studiedLanguage == 'el' && settings.showArticle) {
+      final g = (w.gender ?? '').toLowerCase();
+      String article = '';
+      if (g == 'm' || g == 'м') {
+        article = 'ο';
+      } else if (g == 'f' || g == 'ж') {
+        article = 'η';
+      } else if (g == 'n' || g == 'ср') {
+        article = 'το';
       }
       if (article.isNotEmpty) {
-        question = '$article $question';
+        base = '$article $base';
       }
     }
-    return question;
+    return base;
   }
 
-  String _getQuestionText(Word word, AppSettings settings, {bool forTts = false}) {
-    return switch (settings.studiedLanguage) {
-      'el' => _getWordWithArticle(word, settings, forTts: forTts),
-      'en' => word.en ?? '',
-      'ru' => word.ru,
-      _ => _getWordWithArticle(word, settings, forTts: forTts),
+  /// Текст ответа (answerLanguage) — без артикля
+  String _answerText(Word w, AppSettings settings) {
+    return switch (settings.answerLanguage) {
+      'el' => w.el,
+      'ru' => w.ru,
+      'en' => w.en ?? '',
+      _ => w.el,
     };
   }
 
@@ -82,51 +73,62 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final textTheme = Theme.of(context).textTheme;
-    final word = widget.word;
-    final questionText = _getQuestionText(word, settings);
 
-    bool shouldShowTranscription = settings.showTranscription || _temporarilyShowTranscription;
-    bool hasTranscription = word.transcription.isNotEmpty;
+    final question = _questionText(widget.word, settings);
+    final answer = _answerText(widget.word, settings);
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Вопрос (основное слово) + TTS
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Flexible(child: Text(questionText, style: textTheme.displaySmall, textAlign: TextAlign.center)),
+            Flexible(
+              child: Text(
+                question,
+                style: textTheme.displaySmall,
+                textAlign: TextAlign.center,
+              ),
+            ),
             IconButton(
               icon: Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
-              onPressed: () => _speakWord(word, settings),
+              onPressed: () {
+                ref.read(ttsServiceProvider).speak(question, settings.studiedLanguage);
+              },
             )
           ],
         ),
-        if (hasTranscription)
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  shouldShowTranscription
-                      ? '[${word.transcription}]'
-                      : '[${'*' * word.transcription.length}]',
-                  style: textTheme.titleLarge?.copyWith(color: Colors.grey.shade600),
-                ),
-                if (!settings.showTranscription) ...[
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.visibility_outlined, size: 20),
-                    color: Colors.grey,
-                    onPressed: () {
-                      setState(() {
-                        _temporarilyShowTranscription = !_temporarilyShowTranscription;
-                      });
-                    },
-                  )
-                ]
-              ],
-            ),
+
+        // Транскрипция (если включено в настройках) или временно по тапу
+        if (settings.showTranscription || _temporarilyShowTranscription) ...[
+          const SizedBox(height: 8),
+          Text(
+            '[${widget.word.transcription}]',
+            style: textTheme.titleLarge?.copyWith(color: Colors.grey.shade600),
+            textAlign: TextAlign.center,
           ),
+        ] else if ((widget.word.transcription).isNotEmpty) ...[
+          const SizedBox(height: 8),
+          IconButton(
+            icon: const Icon(Icons.visibility),
+            color: Colors.grey,
+            onPressed: () {
+              setState(() {
+                _temporarilyShowTranscription = !_temporarilyShowTranscription;
+              });
+            },
+          ),
+        ],
+
+        const SizedBox(height: 24),
+
+        // Ответ (перевод)
+        Text(
+          answer,
+          style: textTheme.headlineMedium?.copyWith(color: Colors.grey.shade700),
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
