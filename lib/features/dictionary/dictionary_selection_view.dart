@@ -1,78 +1,148 @@
-// lib/features/dictionary/dictionary_selection_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:greek_quiz/data/models/dictionary_info.dart';
 import 'package:greek_quiz/data/services/dictionary_service.dart';
+import 'package:greek_quiz/features/dictionary/words_list_view.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
 
 class DictionarySelectionView extends ConsumerStatefulWidget {
   const DictionarySelectionView({super.key});
+
   @override
-  ConsumerState<DictionarySelectionView> createState() => _DictionarySelectionViewState();
+  ConsumerState<DictionarySelectionView> createState() =>
+      _DictionarySelectionViewState();
 }
 
-class _DictionarySelectionViewState extends ConsumerState<DictionarySelectionView> {
-  late Set<String> _localSelectedDictionaries;
-
-  @override
-  void initState() {
-    super.initState();
-    _localSelectedDictionaries = Set.from(ref.read(dictionaryServiceProvider).selectedDictionaries);
-  }
-
+class _DictionarySelectionViewState
+    extends ConsumerState<DictionarySelectionView> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final dictionariesAsync = ref.watch(availableDictionariesProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.select_dictionaries_title),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ref.read(dictionaryServiceProvider).selectedDictionaries = _localSelectedDictionaries;
-              Navigator.of(context).pop();
-            },
-            child: Text(l10n.button_done),
-          ),
-        ],
-      ),
-      body: dictionariesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Ошибка: ${err.toString()}')),
-        data: (dictionaries) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: _buildChips(context, dictionaries),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildChips(BuildContext context, List<DictionaryInfo> dictionaries) {
+    final service = ref.watch(dictionaryServiceProvider);
     final settings = ref.watch(settingsProvider);
-    return Wrap(
-      spacing: 8.0,
-      runSpacing: 8.0,
-      children: dictionaries.map((dictInfo) {
-        final isSelected = _localSelectedDictionaries.contains(dictInfo.file);
-        return FilterChip(
-          label: Text(dictInfo.getLocalizedName(settings.interfaceLanguage)),
-          selected: isSelected,
-          onSelected: (bool selected) {
-            setState(() {
-              if (selected) {
-                _localSelectedDictionaries.add(dictInfo.file);
-              } else {
-                _localSelectedDictionaries.remove(dictInfo.file);
-              }
-            });
-          },
-        );
-      }).toList(),
+
+    // Список доступных словарей
+    final List<DictionaryInfo> available = [...service.availableDictionaries];
+
+    // Сортировка по локализованному названию
+    String locName(DictionaryInfo d) =>
+        d.getLocalizedName(settings.interfaceLanguage);
+    available.sort(
+          (a, b) => locName(a).toLowerCase().compareTo(locName(b).toLowerCase()),
+    );
+
+    final hasSelection = service.selectedDictionaries.isNotEmpty;
+
+    // Заголовок — в 2 раза меньше исходного headlineMedium
+    final baseTitle = Theme.of(context).textTheme.headlineMedium;
+    final tinyTitle = baseTitle?.copyWith(
+      fontSize: (baseTitle?.fontSize ?? 24) * 0.8,
+      fontWeight: FontWeight.w600,
+    );
+
+    return SafeArea(
+      top: false,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Шапка: заголовок по центру (меньше), Done — справа
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+                child: Row(
+                  children: [
+                    // Баланс слева, чтобы центрирование было честным
+                    const SizedBox(width: 64),
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          l10n.select_dictionaries_title,
+                          style: tinyTitle,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: Text(l10n.button_done),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              // Облако "чипов" со словарями
+              Flexible(
+                child: SingleChildScrollView(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 0,
+                    children: [
+                      for (final d in available)
+                        ChoiceChip(
+                          label: Text(locName(d)),
+                          selected:
+                          service.selectedDictionaries.contains(d.file),
+                          onSelected: (_) {
+                            // переключаем выбранность словаря
+                            service.toggleDictionarySelection(d.file);
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Кнопка "Words list" — перед открытием перечитываем активные слова
+              Padding(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: hasSelection
+                          ? () async {
+                        // Обновим activeWords под текущий выбор,
+                        // чтобы список слов не был пустым.
+                        service.filterActiveWords();
+
+                        await showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
+                          ),
+                          builder: (context) => const WordsListView(),
+                        );
+                      }
+                          : null,
+                      child: Text(l10n.button_show_words),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

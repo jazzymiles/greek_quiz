@@ -38,12 +38,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
 
-    // зафиксируем стартовый режим (важно для TalkShow/Keyboard)
+    // стартовый режим (важно для TalkShow/Keyboard)
     Future.microtask(() {
       ref.read(quizModeProvider.notifier).state = _selectedMode;
     });
 
-    // Инициализация + ОДНОКРАТНАЯ автозагрузка (только если есть выбранные словари)
+    // Инициализация + однократная автозагрузка (только если есть выбранные словари)
     Future.microtask(() async {
       final service = ref.read(dictionaryServiceProvider);
       final settings = ref.read(settingsProvider);
@@ -60,7 +60,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final alreadyInstalled = prefs.getBool(_prefsDownloadedKey) ?? false;
 
-      // 4) Если пользователь НЕ выбрал словари — НИЧЕГО не качаем автоматически
+      // 4) Если пользователь НЕ выбрал словари — ничего не качаем
       final hasSelection = service.selectedDictionaries.isNotEmpty;
 
       // 5) Автоскачивание только один раз и только при наличии выбора
@@ -94,9 +94,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onPressed: () => showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
+                useSafeArea: true,
                 backgroundColor: Colors.transparent,
-                builder: (context) => SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.95,
+                builder: (context) => FractionallySizedBox(
+                  heightFactor: 0.95, // делаем экран настроек очень высоким
                   child: const SettingsScreen(),
                 ),
               ),
@@ -110,11 +111,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
+                    useSafeArea: true, // чтобы не залезало под вырез/статусбар
+                    backgroundColor: Colors.transparent,
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                     ),
-                    builder: (context) => SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.6,
+                    builder: (context) => FractionallySizedBox(
+                      heightFactor: 0.92, // ← повышаем высоту окна выбора словарей
                       child: const DictionarySelectionView(),
                     ),
                   );
@@ -167,7 +170,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Center(
               child: Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0), // <-- фикс: именованный параметр
+                  padding: const EdgeInsets.all(24.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

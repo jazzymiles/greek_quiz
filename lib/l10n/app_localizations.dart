@@ -453,6 +453,448 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your translation'**
   String get your_translation_placeholder;
+
+  /// No description provided for @allDictionariesUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'All dictionaries updated!'**
+  String get allDictionariesUpdated;
+
+  /// No description provided for @answerInLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer in language'**
+  String get answerInLanguage;
+
+  /// No description provided for @answersSoundsToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers sound'**
+  String get answersSoundsToggle;
+
+  /// No description provided for @appearanceSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance Settings'**
+  String get appearanceSettingsSection;
+
+  /// No description provided for @autoplaySoundToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Word sound'**
+  String get autoplaySoundToggle;
+
+  /// No description provided for @buttonCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get buttonCheck;
+
+  /// No description provided for @buttonClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get buttonClose;
+
+  /// No description provided for @buttonDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionaries'**
+  String get buttonDictionaries;
+
+  /// No description provided for @buttonNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get buttonNext;
+
+  /// No description provided for @buttonRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get buttonRefresh;
+
+  /// No description provided for @buttonRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get buttonRules;
+
+  /// No description provided for @buttonSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get buttonSettings;
+
+  /// No description provided for @button_show_words.
+  ///
+  /// In en, this message translates to:
+  /// **'Show words'**
+  String get button_show_words;
+
+  /// No description provided for @buttonShowWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Show words'**
+  String get buttonShowWords;
+
+  /// No description provided for @clearingOldDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Clearing old dictionaries'**
+  String get clearingOldDictionaries;
+
+  /// No description provided for @customUrlDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom URL (from internet)'**
+  String get customUrlDictionaries;
+
+  /// No description provided for @dictionariesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionaries'**
+  String get dictionariesSection;
+
+  /// No description provided for @dictionaryDownloadOption1.
+  ///
+  /// In en, this message translates to:
+  /// **'Standart'**
+  String get dictionaryDownloadOption1;
+
+  /// No description provided for @dictionaryDownloadOption2.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal'**
+  String get dictionaryDownloadOption2;
+
+  /// No description provided for @dictionarySource.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictionary Source'**
+  String get dictionarySource;
+
+  /// No description provided for @downloadStatus1.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get downloadStatus1;
+
+  /// No description provided for @downloadStatusText.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading dictionary:'**
+  String get downloadStatusText;
+
+  /// No description provided for @downloadingDictionariesList.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading dictionaries list...'**
+  String get downloadingDictionariesList;
+
+  /// No description provided for @downloadingDictionary.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading dictionary: {dictionaryName} ({progress} of {total})...'**
+  String downloadingDictionary(
+    Object dictionaryName,
+    Object progress,
+    Object total,
+  );
+
+  /// No description provided for @englishLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get englishLanguage;
+
+  /// No description provided for @errorDownloadingDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Error downloading dictionaries: {error}'**
+  String errorDownloadingDictionaries(Object error);
+
+  /// No description provided for @errorIncorrectDownloadUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: Invalid download URL.'**
+  String get errorIncorrectDownloadUrl;
+
+  /// No description provided for @errorInvalidDictionariesListUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: Invalid dictionaries list'**
+  String get errorInvalidDictionariesListUrl;
+
+  /// No description provided for @errorUnknownDictionarySource.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: Unknown dictionary source.'**
+  String get errorUnknownDictionarySource;
+
+  /// No description provided for @greekLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Greek'**
+  String get greekLanguage;
+
+  /// No description provided for @greekLanguageOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Greek'**
+  String get greekLanguageOption;
+
+  /// No description provided for @helpUpdatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Help updated!'**
+  String get helpUpdatedMessage;
+
+  /// No description provided for @helpViewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get helpViewTitle;
+
+  /// No description provided for @interfaceLanguageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface Language'**
+  String get interfaceLanguageSection;
+
+  /// No description provided for @languageGreek.
+  ///
+  /// In en, this message translates to:
+  /// **'Greek'**
+  String get languageGreek;
+
+  /// No description provided for @languageInterfacePicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Interface Language'**
+  String get languageInterfacePicker;
+
+  /// No description provided for @languageOptionEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageOptionEnglish;
+
+  /// No description provided for @languageOptionGreek.
+  ///
+  /// In en, this message translates to:
+  /// **'Greek'**
+  String get languageOptionGreek;
+
+  /// No description provided for @languageOptionRussian.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get languageOptionRussian;
+
+  /// No description provided for @languageOptionSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get languageOptionSystem;
+
+  /// No description provided for @languageSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Languages'**
+  String get languageSettingsSection;
+
+  /// No description provided for @learningSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning Settings'**
+  String get learningSettingsSection;
+
+  /// No description provided for @loadingDictionariesMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading dictionary'**
+  String get loadingDictionariesMessage;
+
+  /// No description provided for @modeCardsDisplayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards'**
+  String get modeCardsDisplayName;
+
+  /// No description provided for @modeKeyboardDisplayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Type In'**
+  String get modeKeyboardDisplayName;
+
+  /// No description provided for @modeQuizDisplayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz'**
+  String get modeQuizDisplayName;
+
+  /// No description provided for @modeTalkshowDisplayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk show'**
+  String get modeTalkshowDisplayName;
+
+  /// No description provided for @noAnswerSelectedFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: No answer selected.\nShowing correct answer.'**
+  String get noAnswerSelectedFeedback;
+
+  /// No description provided for @palceHolderSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search…'**
+  String get palceHolderSearch;
+
+  /// No description provided for @quizLanguageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz Language'**
+  String get quizLanguageSection;
+
+  /// No description provided for @quizSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz settings'**
+  String get quizSettingsSection;
+
+  /// No description provided for @rulesUpdatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules updated!'**
+  String get rulesUpdatedMessage;
+
+  /// No description provided for @rulesViewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get rulesViewTitle;
+
+  /// No description provided for @russianLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Russian'**
+  String get russianLanguage;
+
+  /// No description provided for @searchPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchPlaceholder;
+
+  /// No description provided for @selectAtLeastOneDictionary.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select at least one dictionary.\nTo do this, click the button at the top with this icon'**
+  String get selectAtLeastOneDictionary;
+
+  /// No description provided for @standardDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard dictionaries'**
+  String get standardDictionaries;
+
+  /// No description provided for @studiedLanguagePicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Studied language'**
+  String get studiedLanguagePicker;
+
+  /// No description provided for @themeApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App Theme'**
+  String get themeApp;
+
+  /// No description provided for @themeAppTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Theme'**
+  String get themeAppTitle;
+
+  /// No description provided for @titleQuizMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz mode'**
+  String get titleQuizMode;
+
+  /// No description provided for @titleSelectDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Select dictionaries'**
+  String get titleSelectDictionaries;
+
+  /// No description provided for @titleWordsList.
+  ///
+  /// In en, this message translates to:
+  /// **'Words'**
+  String get titleWordsList;
+
+  /// No description provided for @updateErrorMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Update error: {error}.'**
+  String updateErrorMessage(Object error);
+
+  /// No description provided for @wordsListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Words list'**
+  String get wordsListTitle;
+
+  /// No description provided for @answerLanguagePicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer language'**
+  String get answerLanguagePicker;
+
+  /// No description provided for @useAllWordsToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'All the words in the answers'**
+  String get useAllWordsToggle;
+
+  /// No description provided for @buttonDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get buttonDone;
+
+  /// No description provided for @downloadAndSaveDictionaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and save dictionaries'**
+  String get downloadAndSaveDictionaries;
+
+  /// No description provided for @enterDictionariesFileAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter dictionaries.txt file address'**
+  String get enterDictionariesFileAddress;
+
+  /// No description provided for @showArticleToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show articles'**
+  String get showArticleToggle;
+
+  /// No description provided for @showTranscriptionToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show transcription'**
+  String get showTranscriptionToggle;
+
+  /// No description provided for @yourTranslationPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your translation'**
+  String get yourTranslationPlaceholder;
 }
 
 class _AppLocalizationsDelegate

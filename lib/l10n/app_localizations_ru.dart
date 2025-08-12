@@ -15,13 +15,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get answer_language_picker => 'Язык ответа';
 
   @override
-  String get appearance_section_header => 'ОФОРМЛЕНИЕ';
+  String get appearance_section_header => 'ВНЕШНИЙ ВИД';
 
   @override
   String get answers_sounds_toggle => 'Звуки ответов';
 
   @override
-  String get autoplay_sound_toggle => 'Автопроизношение';
+  String get autoplay_sound_toggle => 'Автовоспроизведение звука';
 
   @override
   String get button_done => 'Готово';
@@ -51,13 +51,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get download_and_save_dictionaries => 'Скачать и сохранить словари';
 
   @override
-  String get download_error => 'Ошибка загрузки';
+  String get download_error => 'Ошибка скачивания';
 
   @override
-  String get download_success => 'Загрузка успешна';
+  String get download_success => 'Скачивание успешно';
 
   @override
-  String get downloading_dictionaries => 'Загрузка словарей...';
+  String get downloading_dictionaries => 'Скачивание словарей...';
 
   @override
   String get enter_dictionaries_file_address => 'Введите адрес файла словарей';
@@ -66,10 +66,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get error_loading_dictionaries => 'Ошибка загрузки словарей: ';
 
   @override
-  String get error_no_dictionaries_selected => 'Не выбраны словари';
+  String get error_no_dictionaries_selected => 'Словари не выбраны';
 
   @override
-  String get error_no_words_loaded => 'Не загружены слова';
+  String get error_no_words_loaded => 'Слова не загружены';
 
   @override
   String get feedback_correct => 'Правильно!';
@@ -81,7 +81,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get help_navigation_title => 'Помощь';
 
   @override
-  String get incorrect_answer_feedback => 'Неверно. Правильный ответ: ';
+  String get incorrect_answer_feedback => 'Неправильно. Правильный ответ: ';
 
   @override
   String get interface_language_picker => 'Язык интерфейса';
@@ -99,7 +99,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get language_ru => 'Русский';
 
   @override
-  String get language_system => 'Как в системе';
+  String get language_system => 'Системный';
 
   @override
   String get languages_section_header => 'ЯЗЫКИ';
@@ -109,7 +109,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get no_dictionaries_available =>
-      'Нет доступных словарей. Пожалуйста, загрузите.';
+      'Нет доступных словарей. Пожалуйста, скачайте.';
 
   @override
   String get no_words_loaded => 'Слова не загружены.';
@@ -118,13 +118,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get picker_dialog_title => 'Выберите вариант';
 
   @override
-  String get quiz_mode_title => 'Квиз';
+  String get quiz_mode_title => 'Тест';
 
   @override
   String get rules_navigation_title => 'Правила';
 
   @override
-  String get score_label => 'Счет: ';
+  String get score_label => 'Счёт: ';
 
   @override
   String get search_bar_placeholder => 'Поиск';
@@ -145,19 +145,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sound_section_header => 'ЗВУК';
 
   @override
-  String get source_custom => 'Свой URL';
+  String get source_custom => 'Пользовательский URL';
 
   @override
-  String get source_local => 'Встроенные';
+  String get source_local => 'Встроенный';
 
   @override
-  String get studied_language_picker => 'Язык изучения';
+  String get studied_language_picker => 'Изучаемый язык';
 
   @override
   String get talk_show_mode_title => 'Ток-шоу';
 
   @override
-  String get theme_dark => 'Темная';
+  String get theme_dark => 'Тёмная';
 
   @override
   String get theme_light => 'Светлая';
@@ -175,7 +175,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get use_all_words_in_answers => 'Все слова в ответах';
 
   @override
-  String get use_all_words_subtitle => 'Для режимов \'Квиз\' и \'Карточки\'';
+  String get use_all_words_subtitle => 'Для режимов \'Тест\' и \'Карточки\'';
 
   @override
   String get use_all_words_toggle => 'Использовать все слова';
@@ -185,4 +185,239 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get your_translation_placeholder => 'Ваш перевод';
+
+  @override
+  String get allDictionariesUpdated => 'Все словари обновлены!';
+
+  @override
+  String get answerInLanguage => 'Отвечать на языке';
+
+  @override
+  String get answersSoundsToggle => 'Звук ответов';
+
+  @override
+  String get appearanceSettingsSection => 'Настройки внешнего вида';
+
+  @override
+  String get autoplaySoundToggle => 'Звук слова';
+
+  @override
+  String get buttonCheck => 'Проверить';
+
+  @override
+  String get buttonClose => 'Закрыть';
+
+  @override
+  String get buttonDictionaries => 'Словари';
+
+  @override
+  String get buttonNext => 'Далее';
+
+  @override
+  String get buttonRefresh => 'Обновить';
+
+  @override
+  String get buttonRules => 'Правила';
+
+  @override
+  String get buttonSettings => 'Настройки';
+
+  @override
+  String get button_show_words => 'Показать слова';
+
+  @override
+  String get buttonShowWords => 'Показать слова';
+
+  @override
+  String get clearingOldDictionaries => 'Удаление старых словарей';
+
+  @override
+  String get customUrlDictionaries => 'Пользовательский URL (из интернета)';
+
+  @override
+  String get dictionariesSection => 'Словари';
+
+  @override
+  String get dictionaryDownloadOption1 => 'Стандартный';
+
+  @override
+  String get dictionaryDownloadOption2 => 'Персональный';
+
+  @override
+  String get dictionarySource => 'Источник словаря';
+
+  @override
+  String get downloadStatus1 => 'Скачивание...';
+
+  @override
+  String get downloadStatusText => 'Загрузка словаря:';
+
+  @override
+  String get downloadingDictionariesList => 'Скачивание списка словарей...';
+
+  @override
+  String downloadingDictionary(
+    Object dictionaryName,
+    Object progress,
+    Object total,
+  ) {
+    return 'Скачивание словаря: $dictionaryName ($progress из $total)...';
+  }
+
+  @override
+  String get englishLanguage => 'Английский';
+
+  @override
+  String errorDownloadingDictionaries(Object error) {
+    return 'Ошибка скачивания словарей: $error';
+  }
+
+  @override
+  String get errorIncorrectDownloadUrl =>
+      'Ошибка: Неверный URL для скачивания.';
+
+  @override
+  String get errorInvalidDictionariesListUrl =>
+      'Ошибка: Неверный список словарей';
+
+  @override
+  String get errorUnknownDictionarySource =>
+      'Ошибка: Неизвестный источник словаря.';
+
+  @override
+  String get greekLanguage => 'Греческий';
+
+  @override
+  String get greekLanguageOption => 'Греческий';
+
+  @override
+  String get helpUpdatedMessage => 'Помощь обновлена!';
+
+  @override
+  String get helpViewTitle => 'Помощь';
+
+  @override
+  String get interfaceLanguageSection => 'Язык интерфейса';
+
+  @override
+  String get languageGreek => 'Греческий';
+
+  @override
+  String get languageInterfacePicker => 'Язык интерфейса';
+
+  @override
+  String get languageOptionEnglish => 'Английский';
+
+  @override
+  String get languageOptionGreek => 'Греческий';
+
+  @override
+  String get languageOptionRussian => 'Русский';
+
+  @override
+  String get languageOptionSystem => 'Системный';
+
+  @override
+  String get languageSettingsSection => 'Языки';
+
+  @override
+  String get learningSettingsSection => 'Настройки обучения';
+
+  @override
+  String get loadingDictionariesMessage => 'Загрузка словаря';
+
+  @override
+  String get modeCardsDisplayName => 'Карточки';
+
+  @override
+  String get modeKeyboardDisplayName => 'Ввод с клавиатуры';
+
+  @override
+  String get modeQuizDisplayName => 'Тест';
+
+  @override
+  String get modeTalkshowDisplayName => 'Ток-шоу';
+
+  @override
+  String get noAnswerSelectedFeedback =>
+      'Ошибка: Ответ не выбран.\nПоказывается правильный ответ.';
+
+  @override
+  String get palceHolderSearch => 'Поиск...';
+
+  @override
+  String get quizLanguageSection => 'Язык теста';
+
+  @override
+  String get quizSettingsSection => 'Настройки теста';
+
+  @override
+  String get rulesUpdatedMessage => 'Правила обновлены!';
+
+  @override
+  String get rulesViewTitle => 'Правила';
+
+  @override
+  String get russianLanguage => 'Русский';
+
+  @override
+  String get searchPlaceholder => 'Поиск';
+
+  @override
+  String get selectAtLeastOneDictionary =>
+      'Пожалуйста, выберите хотя бы один словарь.\nДля этого нажмите на кнопку вверху с этим значком';
+
+  @override
+  String get standardDictionaries => 'Стандартные словари';
+
+  @override
+  String get studiedLanguagePicker => 'Изучаемый язык';
+
+  @override
+  String get themeApp => 'Тема приложения';
+
+  @override
+  String get themeAppTitle => 'Тема приложения';
+
+  @override
+  String get titleQuizMode => 'Режим теста';
+
+  @override
+  String get titleSelectDictionaries => 'Выбор словарей';
+
+  @override
+  String get titleWordsList => 'Слова';
+
+  @override
+  String updateErrorMessage(Object error) {
+    return 'Ошибка обновления: $error.';
+  }
+
+  @override
+  String get wordsListTitle => 'Список слов';
+
+  @override
+  String get answerLanguagePicker => 'Язык ответа';
+
+  @override
+  String get useAllWordsToggle => 'Все слова в ответах';
+
+  @override
+  String get buttonDone => 'Готово';
+
+  @override
+  String get downloadAndSaveDictionaries => 'Скачать и сохранить словари';
+
+  @override
+  String get enterDictionariesFileAddress =>
+      'Введите адрес файла dictionaries.txt';
+
+  @override
+  String get showArticleToggle => 'Показывать артикли';
+
+  @override
+  String get showTranscriptionToggle => 'Показывать транскрипцию';
+
+  @override
+  String get yourTranslationPlaceholder => 'Ваш перевод';
 }

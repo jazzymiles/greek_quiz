@@ -186,4 +186,238 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get your_translation_placeholder => 'Your translation';
+
+  @override
+  String get allDictionariesUpdated => 'All dictionaries updated!';
+
+  @override
+  String get answerInLanguage => 'Answer in language';
+
+  @override
+  String get answersSoundsToggle => 'Answers sound';
+
+  @override
+  String get appearanceSettingsSection => 'Appearance Settings';
+
+  @override
+  String get autoplaySoundToggle => 'Word sound';
+
+  @override
+  String get buttonCheck => 'Check';
+
+  @override
+  String get buttonClose => 'Close';
+
+  @override
+  String get buttonDictionaries => 'Dictionaries';
+
+  @override
+  String get buttonNext => 'Next';
+
+  @override
+  String get buttonRefresh => 'Refresh';
+
+  @override
+  String get buttonRules => 'Rules';
+
+  @override
+  String get buttonSettings => 'Settings';
+
+  @override
+  String get button_show_words => 'Show words';
+
+  @override
+  String get buttonShowWords => 'Show words';
+
+  @override
+  String get clearingOldDictionaries => 'Clearing old dictionaries';
+
+  @override
+  String get customUrlDictionaries => 'Custom URL (from internet)';
+
+  @override
+  String get dictionariesSection => 'Dictionaries';
+
+  @override
+  String get dictionaryDownloadOption1 => 'Standart';
+
+  @override
+  String get dictionaryDownloadOption2 => 'Personal';
+
+  @override
+  String get dictionarySource => 'Dictionary Source';
+
+  @override
+  String get downloadStatus1 => 'Downloading…';
+
+  @override
+  String get downloadStatusText => 'Loading dictionary:';
+
+  @override
+  String get downloadingDictionariesList => 'Downloading dictionaries list...';
+
+  @override
+  String downloadingDictionary(
+    Object dictionaryName,
+    Object progress,
+    Object total,
+  ) {
+    return 'Downloading dictionary: $dictionaryName ($progress of $total)...';
+  }
+
+  @override
+  String get englishLanguage => 'English';
+
+  @override
+  String errorDownloadingDictionaries(Object error) {
+    return 'Error downloading dictionaries: $error';
+  }
+
+  @override
+  String get errorIncorrectDownloadUrl => 'Error: Invalid download URL.';
+
+  @override
+  String get errorInvalidDictionariesListUrl =>
+      'Error: Invalid dictionaries list';
+
+  @override
+  String get errorUnknownDictionarySource =>
+      'Error: Unknown dictionary source.';
+
+  @override
+  String get greekLanguage => 'Greek';
+
+  @override
+  String get greekLanguageOption => 'Greek';
+
+  @override
+  String get helpUpdatedMessage => 'Help updated!';
+
+  @override
+  String get helpViewTitle => 'Help';
+
+  @override
+  String get interfaceLanguageSection => 'Interface Language';
+
+  @override
+  String get languageGreek => 'Greek';
+
+  @override
+  String get languageInterfacePicker => 'Interface Language';
+
+  @override
+  String get languageOptionEnglish => 'English';
+
+  @override
+  String get languageOptionGreek => 'Greek';
+
+  @override
+  String get languageOptionRussian => 'Russian';
+
+  @override
+  String get languageOptionSystem => 'System';
+
+  @override
+  String get languageSettingsSection => 'Languages';
+
+  @override
+  String get learningSettingsSection => 'Learning Settings';
+
+  @override
+  String get loadingDictionariesMessage => 'Loading dictionary';
+
+  @override
+  String get modeCardsDisplayName => 'Cards';
+
+  @override
+  String get modeKeyboardDisplayName => 'Type In';
+
+  @override
+  String get modeQuizDisplayName => 'Quiz';
+
+  @override
+  String get modeTalkshowDisplayName => 'Talk show';
+
+  @override
+  String get noAnswerSelectedFeedback =>
+      'Error: No answer selected.\nShowing correct answer.';
+
+  @override
+  String get palceHolderSearch => 'Search…';
+
+  @override
+  String get quizLanguageSection => 'Quiz Language';
+
+  @override
+  String get quizSettingsSection => 'Quiz settings';
+
+  @override
+  String get rulesUpdatedMessage => 'Rules updated!';
+
+  @override
+  String get rulesViewTitle => 'Rules';
+
+  @override
+  String get russianLanguage => 'Russian';
+
+  @override
+  String get searchPlaceholder => 'Search';
+
+  @override
+  String get selectAtLeastOneDictionary =>
+      'Please select at least one dictionary.\nTo do this, click the button at the top with this icon';
+
+  @override
+  String get standardDictionaries => 'Standard dictionaries';
+
+  @override
+  String get studiedLanguagePicker => 'Studied language';
+
+  @override
+  String get themeApp => 'App Theme';
+
+  @override
+  String get themeAppTitle => 'App Theme';
+
+  @override
+  String get titleQuizMode => 'Quiz mode';
+
+  @override
+  String get titleSelectDictionaries => 'Select dictionaries';
+
+  @override
+  String get titleWordsList => 'Words';
+
+  @override
+  String updateErrorMessage(Object error) {
+    return 'Update error: $error.';
+  }
+
+  @override
+  String get wordsListTitle => 'Words list';
+
+  @override
+  String get answerLanguagePicker => 'Answer language';
+
+  @override
+  String get useAllWordsToggle => 'All the words in the answers';
+
+  @override
+  String get buttonDone => 'Done';
+
+  @override
+  String get downloadAndSaveDictionaries => 'Download and save dictionaries';
+
+  @override
+  String get enterDictionariesFileAddress =>
+      'Enter dictionaries.txt file address';
+
+  @override
+  String get showArticleToggle => 'Show articles';
+
+  @override
+  String get showTranscriptionToggle => 'Show transcription';
+
+  @override
+  String get yourTranslationPlaceholder => 'Your translation';
 }
