@@ -7,8 +7,13 @@ import 'package:greek_quiz/shared/services/tts_service.dart';
 
 class WordDisplay extends ConsumerStatefulWidget {
   final Word word;
+  final bool autoplayEnabled;
 
-  const WordDisplay({super.key, required this.word});
+  const WordDisplay({
+    super.key,
+    required this.word,
+    this.autoplayEnabled = true,
+  });
 
   @override
   ConsumerState<WordDisplay> createState() => _WordDisplayState();
@@ -16,6 +21,12 @@ class WordDisplay extends ConsumerStatefulWidget {
 
 class _WordDisplayState extends ConsumerState<WordDisplay> {
   bool _temporarilyShowTranscription = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => _handleAutoplay(widget.word));
+  }
 
   @override
   void didUpdateWidget(covariant WordDisplay oldWidget) {
@@ -26,13 +37,9 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => _handleAutoplay(widget.word));
-  }
-
   void _handleAutoplay(Word word) {
+    if (!widget.autoplayEnabled) return;
+
     final settings = ref.read(settingsProvider);
     if (settings.autoPlaySound) {
       _speakWord(word, settings);

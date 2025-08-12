@@ -1,16 +1,33 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:flutter/foundation.dart';
 import 'package:audio_session/audio_session.dart';
 
 class TtsService {
-  final FlutterTts _flutterTts = FlutterTts();
+  final FlutterTts _tts = FlutterTts();
+
+  TtsService() {
+    _initTts();
+  }
+
+  void _initTts() {
+    // Гарантируем, что speak() будет дожидаться окончания речи
+    // и не вернёт Future раньше времени.
+    _tts.awaitSpeakCompletion(true);
+  }
 
   Future<void> speak(String text, String langCode) async {
+    if (text.isEmpty) return;
+
     final session = await AudioSession.instance;
     await session.setActive(true);
 
-    if (text.isEmpty) return;
+    // Перед новой фразой аккуратно прерываем предыдущую,
+    // чтобы не было наложений и «залипаний».
+    try {
+      await _tts.stop();
+      // ignore: empty_catches
+    } catch (_) {}
 
     final ttsLangCode = switch (langCode) {
       'el' => 'el-GR',
@@ -19,19 +36,24 @@ class TtsService {
       _ => 'el-GR',
     };
 
+    await _tts.setLanguage(ttsLangCode);
+
     try {
-      await _flutterTts.setLanguage(ttsLangCode);
-
-      // ИСПРАВЛЕНИЕ №1: Устанавливаем высоту тона (pitch)
-      // Значение 1.0 — это нормальный, нейтральный тон голоса.
-      await _flutterTts.setPitch(1.0);
-
-      // ИСПРАВЛЕНИЕ №2: Слегка замедляем речь для большей ясности
-      await _flutterTts.setSpeechRate(0.4);
-
-      await _flutterTts.speak(text);
+      await _tts.speak(text); // вернётся, когда закончит, благодаря awaitSpeakCompletion(true)
     } catch (e) {
-      print("🔥 Ошибка при вызове speak: $e");
+      // Логируем, но не пробрасываем, чтобы UI не падал
+      // Можно добавить Sentry/Crashlytics при необходимости
+      // print("TTS speak error: $e");
+    }
+  }
+
+  Future<void> stop() async {
+    try {
+      await _tts.stop();
+    } finally {
+      // По желанию можно деактивировать сессию:
+      // final session = await AudioSession.instance;
+      // await session.setActive(false);
     }
   }
 }
