@@ -23,7 +23,13 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  // prefs keys
   static const _prefsDownloadedKey = 'dicts_installed_v1';
+  static const _prefsSelectedDictsKey = 'selected_dictionaries_v1';
+  static const _prefsQuizModeKey = 'quiz_mode_v1';
+  static const _prefsLangStudied = 'settings.studiedLanguage';
+  static const _prefsLangAnswer = 'settings.answerLanguage';
+  static const _prefsLangInterface = 'settings.interfaceLanguage';
 
   QuizMode _selectedMode = QuizMode.quiz;
 
@@ -37,40 +43,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-
-    // стартовый режим (важно для TalkShow/Keyboard)
-    Future.microtask(() {
-      ref.read(quizModeProvider.notifier).state = _selectedMode;
-    });
-
-    // Инициализация + однократная автозагрузка (только если есть выбранные словари)
     Future.microtask(() async {
-      final service = ref.read(dictionaryServiceProvider);
-      final settings = ref.read(settingsProvider);
+      final prefs = await SharedPreferences.getInstance();
 
-      // 1) Инициализация локальных данных
+      // === ВОССТАНОВЛЕНИЕ ЯЗЫКОВ (через существующие методы в SettingsNotifier) ===
+      final settingsNotifier = ref.read(settingsProvider.notifier);
+      final studied = prefs.getString(_prefsLangStudied);
+      final answer = prefs.getString(_prefsLangAnswer);
+      final iface = prefs.getString(_prefsLangInterface);
+      if (studied != null) settingsNotifier.updateStudiedLanguage(studied);
+      if (answer != null) settingsNotifier.updateAnswerLanguage(answer);
+      if (iface != null) settingsNotifier.updateInterfaceLanguage(iface);
+
+      // === Инициализация словарей ===
+      final service = ref.read(dictionaryServiceProvider);
       await service.initialize();
 
-      // 2) Обновим режимы — подхватить локальные данные, если есть
+      // === ВОССТАНОВЛЕНИЕ ВЫБРАННЫХ СЛОВАРЕЙ ===
+      final savedSelected = prefs.getStringList(_prefsSelectedDictsKey);
+      if (savedSelected != null) {
+        service.selectedDictionaries
+          ..clear()
+          ..addAll(savedSelected);
+        service.filterActiveWords();
+      }
+
+      // === ВОССТАНОВЛЕНИЕ РЕЖИМА ===
+      final savedModeIndex = prefs.getInt(_prefsQuizModeKey);
+      if (savedModeIndex != null &&
+          savedModeIndex >= 0 &&
+          savedModeIndex < QuizMode.values.length) {
+        _selectedMode = QuizMode.values[savedModeIndex];
+      }
+      // уведомим провайдер о текущем режиме (важно для TalkShow/Keyboard)
+      ref.read(quizModeProvider.notifier).state = _selectedMode;
+
+      // === Обновим режимы квиза под восстановленные данные ===
       ref.read(quizProvider.notifier).refresh();
       ref.read(keyboardQuizProvider.notifier).refresh();
       ref.read(cardModeProvider.notifier).refresh();
 
-      // 3) Проверим, качали ли уже когда-нибудь словари
-      final prefs = await SharedPreferences.getInstance();
+      // === Однократная автоскачка словарей — только при наличии выбора ===
       final alreadyInstalled = prefs.getBool(_prefsDownloadedKey) ?? false;
-
-      // 4) Если пользователь НЕ выбрал словари — ничего не качаем
       final hasSelection = service.selectedDictionaries.isNotEmpty;
-
-      // 5) Автоскачивание только один раз и только при наличии выбора
       if (!alreadyInstalled && hasSelection) {
+        final settings = ref.read(settingsProvider);
         await service.downloadAndSaveDictionaries(settings.interfaceLanguage);
-
-        // 6) Отметим, что словари уже установлены — чтобы не качать на каждом запуске
         await prefs.setBool(_prefsDownloadedKey, true);
 
-        // 7) После загрузки обновим режимы ещё раз
+        // обновим провайдеры после загрузки
         ref.read(quizProvider.notifier).refresh();
         ref.read(keyboardQuizProvider.notifier).refresh();
         ref.read(cardModeProvider.notifier).refresh();
@@ -91,18 +112,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             leading: IconButton(
               icon: const Icon(Icons.settings_outlined),
               tooltip: l10n.title_settings_navigation,
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => FractionallySizedBox(
-                  heightFactor: 0.95, // делаем экран настроек очень высоким
-                  child: const SettingsScreen(),
-                ),
-              ),
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => FractionallySizedBox(
+                    heightFactor: 0.95,
+                    child: const SettingsScreen(),
+                  ),
+                );
+
+                // Сохраняем актуальные настройки языков при закрытии экрана
+                final prefs = await SharedPreferences.getInstance();
+                final s = ref.read(settingsProvider);
+                await prefs.setString(_prefsLangStudied, s.studiedLanguage);
+                await prefs.setString(_prefsLangAnswer, s.answerLanguage);
+                await prefs.setString(_prefsLangInterface, s.interfaceLanguage);
+              },
             ),
-            title: null, // без заголовка
+            title: null,
             actions: [
               IconButton(
                 icon: const Icon(Icons.library_books_outlined),
@@ -111,18 +141,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
-                    useSafeArea: true, // чтобы не залезало под вырез/статусбар
+                    useSafeArea: true,
                     backgroundColor: Colors.transparent,
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                     ),
                     builder: (context) => FractionallySizedBox(
-                      heightFactor: 0.92, // ← повышаем высоту окна выбора словарей
+                      heightFactor: 0.92,
                       child: const DictionarySelectionView(),
                     ),
                   );
 
-                  // После изменения выбора — просто обновляем провайдеры.
+                  // После закрытия — сохраняем выбор словарей
+                  final prefs = await SharedPreferences.getInstance();
+                  final service = ref.read(dictionaryServiceProvider);
+                  await prefs.setStringList(
+                    _prefsSelectedDictsKey,
+                    List<String>.from(service.selectedDictionaries),
+                  );
+
+                  // и обновим провайдеры
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
                   ref.read(cardModeProvider.notifier).refresh();
@@ -146,12 +184,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ButtonSegment(value: QuizMode.talkShow, label: Text(l10n.talk_show_mode_title)),
                   ],
                   selected: {_selectedMode},
-                  onSelectionChanged: (Set<QuizMode> newSelection) {
+                  onSelectionChanged: (Set<QuizMode> newSelection) async {
                     setState(() {
                       _selectedMode = newSelection.first;
                     });
-                    // уведомим о смене режима (важно для TalkShow/Keyboard)
+                    // уведомим о смене режима
                     ref.read(quizModeProvider.notifier).state = _selectedMode;
+
+                    // и сохраним режим
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setInt(_prefsQuizModeKey, _selectedMode.index);
                   },
                 ),
               ),

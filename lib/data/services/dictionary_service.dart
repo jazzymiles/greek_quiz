@@ -8,8 +8,12 @@ import 'package:greek_quiz/data/models/dictionary_info.dart';
 import 'package:greek_quiz/data/models/word.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DictionaryService extends ChangeNotifier {
+  // Ключ для SharedPreferences — фиксируем здесь, чтобы использовать из любых мест
+  static const _prefsDownloadedKey = 'dicts_installed_v1';
+
   List<Word> activeWords = [];
   List<DictionaryInfo> availableDictionaries = [];
   Set<String> selectedDictionaries = {};
@@ -50,18 +54,22 @@ class DictionaryService extends ChangeNotifier {
           final jsonString = await file.readAsString();
           final List<dynamic> jsonList = json.decode(jsonString);
           _allLoadedWords.addAll(jsonList.map((json) => Word.fromJson(json, dictInfo.file)));
-        } catch(e) {
-          print("Ошибка парсинга файла ${dictInfo.file}: $e");
+        } catch (e) {
+          if (kDebugMode) {
+            print("Ошибка парсинга файла ${dictInfo.file}: $e");
+          }
         }
       }
     }
-    print("Всего загружено с диска ${_allLoadedWords.length} слов.");
+    if (kDebugMode) {
+      print("Всего загружено с диска ${_allLoadedWords.length} слов.");
+    }
   }
 
   void filterActiveWords() {
     activeWords.clear();
     if (selectedDictionaries.isEmpty) {
-      print("Словари не выбраны, активных слов нет.");
+      if (kDebugMode) print("Словари не выбраны, активных слов нет.");
       notifyListeners();
       return;
     }
@@ -70,7 +78,9 @@ class DictionaryService extends ChangeNotifier {
         .where((word) => selectedDictionaries.contains(word.dictionaryId))
         .toList();
 
-    print("Отфильтровано ${activeWords.length} активных слов из ${selectedDictionaries.length} словарей.");
+    if (kDebugMode) {
+      print("Отфильтровано ${activeWords.length} активных слов из ${selectedDictionaries.length} словарей.");
+    }
     activeWords.shuffle(_random);
     notifyListeners();
   }
@@ -87,16 +97,14 @@ class DictionaryService extends ChangeNotifier {
             .map((json) => DictionaryInfo.fromJson(json as Map<String, dynamic>))
             .toList();
 
-        // ВАЖНО: ничего не выбираем автоматически.
-        // selectedDictionaries остаётся пустым, пока пользователь сам не выберет.
-        // if (availableDictionaries.isNotEmpty && selectedDictionaries.isEmpty) {
-        //   selectedDictionaries.add(availableDictionaries.first.file);
-        // }
+        // ВАЖНО: НЕ автовыбираем первый словарь — стартовое состояние «ничего не выбрано»
+        // (это исправляет проблему с нежелательной автозагрузкой на чистом старте)
+
       } else {
         throw Exception('Failed to load settings from server');
       }
     } catch (e) {
-      print("Ошибка загрузки настроек словарей: $e");
+      if (kDebugMode) print("Ошибка загрузки настроек словарей: $e");
       availableDictionaries = [];
     }
   }
@@ -106,32 +114,52 @@ class DictionaryService extends ChangeNotifier {
     statusMessage = "downloading_dictionaries";
     downloadProgress = 0.0;
     notifyListeners();
+
     try {
       final Directory supportDir = await getApplicationSupportDirectory();
       final dictionariesDir = Directory('${supportDir.path}/DownloadedDictionaries');
-      if (!await dictionariesDir.exists()) await dictionariesDir.create(recursive: true);
+      if (!await dictionariesDir.exists()) {
+        await dictionariesDir.create(recursive: true);
+      }
 
-      int total = availableDictionaries.length;
+      final total = availableDictionaries.length;
       for (int i = 0; i < total; i++) {
         final dictInfo = availableDictionaries[i];
         statusMessage = dictInfo.getLocalizedName(interfaceLanguage);
         downloadProgress = (i + 1) / total;
         notifyListeners();
+
         final response = await http.get(Uri.parse(dictInfo.filePath));
         if (response.statusCode == 200) {
           final file = File('${dictionariesDir.path}/${dictInfo.file}');
           final decodedBody = utf8.decode(response.bodyBytes);
           await file.writeAsString(decodedBody);
+        } else {
+          if (kDebugMode) {
+            print('Ошибка HTTP ${response.statusCode} при загрузке ${dictInfo.filePath}');
+          }
         }
       }
+
       statusMessage = "all_dictionaries_updated";
       notifyListeners();
+
+      // Обновляем загруженные слова и активные
       await loadAllWordsFromDisk();
       filterActiveWords();
+
+      // === ФИКС: помечаем, что словари установлены (чтобы на следующем старте не качать заново) ===
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_prefsDownloadedKey, true);
+      } catch (_) {
+        // молча игнорируем возможные проблемы с SharedPreferences
+      }
+
     } catch (e) {
       statusMessage = "download_error";
       notifyListeners();
-      print("Ошибка при скачивании: $e");
+      if (kDebugMode) print("Ошибка при скачивании: $e");
     } finally {
       await Future.delayed(const Duration(seconds: 2));
       isDownloading = false;
@@ -144,21 +172,28 @@ class DictionaryService extends ChangeNotifier {
     return activeWords[_random.nextInt(activeWords.length)];
   }
 
-  List<Word> getQuizOptions({required Word excludeWord, required bool useAllWords, int count = 3}) {
+  List<Word> getQuizOptions({
+    required Word excludeWord,
+    required bool useAllWords,
+    int count = 3,
+  }) {
     final sourceList = useAllWords ? _allLoadedWords : activeWords;
     if (sourceList.length < 4) return [];
 
-    final options = List<Word>.from(sourceList)..removeWhere((word) => word.id == excludeWord.id);
+    final options = List<Word>.from(sourceList)
+      ..removeWhere((word) => word.id == excludeWord.id);
     options.shuffle(_random);
     return options.take(count).toList();
   }
 }
 
-final dictionaryServiceProvider = ChangeNotifierProvider<DictionaryService>((ref) {
+final dictionaryServiceProvider =
+ChangeNotifierProvider<DictionaryService>((ref) {
   return DictionaryService();
 });
 
-final availableDictionariesProvider = FutureProvider<List<DictionaryInfo>>((ref) async {
+final availableDictionariesProvider =
+FutureProvider<List<DictionaryInfo>>((ref) async {
   final service = ref.read(dictionaryServiceProvider);
   await service.fetchAvailableDictionaries();
   return service.availableDictionaries;

@@ -35,7 +35,7 @@ class _DictionarySelectionViewState
 
     final hasSelection = service.selectedDictionaries.isNotEmpty;
 
-    // Заголовок — в 2 раза меньше исходного headlineMedium
+    // Заголовок — компактный
     final baseTitle = Theme.of(context).textTheme.headlineMedium;
     final tinyTitle = baseTitle?.copyWith(
       fontSize: (baseTitle?.fontSize ?? 24) * 0.8,
@@ -82,8 +82,7 @@ class _DictionarySelectionViewState
               // Облако "чипов" со словарями
               Flexible(
                 child: SingleChildScrollView(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                   child: Wrap(
                     spacing: 10,
                     runSpacing: 0,
@@ -91,8 +90,7 @@ class _DictionarySelectionViewState
                       for (final d in available)
                         ChoiceChip(
                           label: Text(locName(d)),
-                          selected:
-                          service.selectedDictionaries.contains(d.file),
+                          selected: service.selectedDictionaries.contains(d.file),
                           onSelected: (_) {
                             // переключаем выбранность словаря
                             service.toggleDictionarySelection(d.file);
@@ -107,8 +105,7 @@ class _DictionarySelectionViewState
 
               // Кнопка "Words list" — перед открытием перечитываем активные слова
               Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
@@ -124,6 +121,7 @@ class _DictionarySelectionViewState
                         await showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
+                          useSafeArea: true,
                           backgroundColor: Colors.transparent,
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.vertical(
