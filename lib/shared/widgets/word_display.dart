@@ -1,3 +1,4 @@
+// lib/shared/widgets/word_display.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/models/word.dart';
@@ -9,10 +10,15 @@ class WordDisplay extends ConsumerStatefulWidget {
   final Word word;
   final bool autoplayEnabled;
 
+  /// Показывать ли перевод (ответ).
+  /// По умолчанию false — чтобы в режимах quiz/keyboard/карточки ответ не «палился» сразу.
+  final bool showAnswer;
+
   const WordDisplay({
     super.key,
     required this.word,
     this.autoplayEnabled = true,
+    this.showAnswer = false,
   });
 
   @override
@@ -25,12 +31,30 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // автоплей вопроса, если включено
-    final settings = ref.read(settingsProvider);
-    if (widget.autoplayEnabled && settings.autoPlaySound) {
-      final text = _questionText(widget.word, settings);
-      ref.read(ttsServiceProvider).speak(text, settings.studiedLanguage);
+    _maybeAutoplayCurrentWord();
+  }
+
+  @override
+  void didUpdateWidget(covariant WordDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Если сменилось слово — озвучим заново при включённом автоплее
+    if (oldWidget.word.id != widget.word.id) {
+      _maybeAutoplayCurrentWord(stopBefore: true);
+      // при смене слова скрываем разовое отображение транскрипции
+      _temporarilyShowTranscription = false;
     }
+  }
+
+  Future<void> _maybeAutoplayCurrentWord({bool stopBefore = false}) async {
+    final settings = ref.read(settingsProvider);
+    if (!(widget.autoplayEnabled && settings.autoPlaySound)) return;
+
+    final tts = ref.read(ttsServiceProvider);
+    if (stopBefore) {
+      await tts.stop();
+    }
+    final text = _questionText(widget.word, settings);
+    await tts.speak(text, settings.studiedLanguage);
   }
 
   /// Текст вопроса (studiedLanguage) с учётом "показывать артикли"
@@ -93,8 +117,10 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
             ),
             IconButton(
               icon: Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
-              onPressed: () {
-                ref.read(ttsServiceProvider).speak(question, settings.studiedLanguage);
+              onPressed: () async {
+                final tts = ref.read(ttsServiceProvider);
+                await tts.stop();
+                await tts.speak(question, settings.studiedLanguage);
               },
             )
           ],
@@ -121,14 +147,15 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
           ),
         ],
 
-        const SizedBox(height: 24),
-
-        // Ответ (перевод)
-        Text(
-          answer,
-          style: textTheme.headlineMedium?.copyWith(color: Colors.grey.shade700),
-          textAlign: TextAlign.center,
-        ),
+        // Перевод (ответ) — ТОЛЬКО если явно разрешено showAnswer
+        if (widget.showAnswer) ...[
+          const SizedBox(height: 24),
+          Text(
+            answer,
+            style: textTheme.headlineMedium?.copyWith(color: Colors.grey.shade700),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ],
     );
   }

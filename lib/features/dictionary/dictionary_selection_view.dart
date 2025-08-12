@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:greek_quiz/data/models/dictionary_info.dart';
 import 'package:greek_quiz/data/services/dictionary_service.dart';
@@ -17,6 +18,17 @@ class DictionarySelectionView extends ConsumerStatefulWidget {
 
 class _DictionarySelectionViewState
     extends ConsumerState<DictionarySelectionView> {
+  static const _prefsSelectedDictsKey = 'selected_dictionaries_v1';
+
+  Future<void> _saveSelection() async {
+    final prefs = await SharedPreferences.getInstance();
+    final service = ref.read(dictionaryServiceProvider);
+    await prefs.setStringList(
+      _prefsSelectedDictsKey,
+      List<String>.from(service.selectedDictionaries),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -70,7 +82,11 @@ class _DictionarySelectionViewState
                       ),
                     ),
                     TextButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: () async {
+                        service.filterActiveWords();
+                        await _saveSelection();
+                        if (mounted) Navigator.of(context).maybePop();
+                      },
                       child: Text(l10n.button_done),
                     ),
                   ],
@@ -91,9 +107,11 @@ class _DictionarySelectionViewState
                         ChoiceChip(
                           label: Text(locName(d)),
                           selected: service.selectedDictionaries.contains(d.file),
-                          onSelected: (_) {
-                            // переключаем выбранность словаря
+                          onSelected: (_) async {
                             service.toggleDictionarySelection(d.file);
+                            service.filterActiveWords();
+                            await _saveSelection(); // автосейв на каждый тап
+                            setState(() {}); // обновим кнопку "Words list"
                           },
                         ),
                     ],
@@ -114,10 +132,8 @@ class _DictionarySelectionViewState
                     child: FilledButton(
                       onPressed: hasSelection
                           ? () async {
-                        // Обновим activeWords под текущий выбор,
-                        // чтобы список слов не был пустым.
                         service.filterActiveWords();
-
+                        await _saveSelection();
                         await showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,

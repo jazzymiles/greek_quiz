@@ -1,69 +1,58 @@
-import 'package:flutter/foundation.dart';
-
-@immutable
 class Word {
   final String id;
-  final String ru;
-  final String el;
-  final String? en;
-  final String transcription;
-  final String? partOfSpeech;
   final String dictionaryId;
+
+  final String el;
+  final String ru;
+  final String? en;
+
+  final String transcription;
   final String? gender;
 
-  final String? ruExample;
-  final String? elExample;
-  final String? enExample;
+  // Доп. пример(ы) использования по языкам (если есть в данных)
+  final Map<String, String>? examples;
 
-  const Word({
+  Word({
     required this.id,
-    required this.ru,
-    required this.el,
-    this.en,
-    required this.transcription,
-    this.partOfSpeech,
     required this.dictionaryId,
-    this.gender,
-    this.ruExample,
-    this.elExample,
-    this.enExample,
+    required this.el,
+    required this.ru,
+    required this.en,
+    required this.transcription,
+    required this.gender,
+    required this.examples,
   });
 
   factory Word.fromJson(Map<String, dynamic> json, String dictionaryId) {
+    final el = (json['el'] ?? '').toString();
+    final ru = (json['ru'] ?? '').toString();
+    final en = json['en']?.toString();
+    final transcription = (json['transcription'] ?? '').toString();
+    final gender = json['gender']?.toString();
+
+    // id: либо из данных, либо составной (чтобы избежать конфликтов)
+    final id = (json['id']?.toString() ?? '${dictionaryId}|$el');
+
+    // примеры: ожидаем словарь строк по языкам (если нет — null)
+    Map<String, String>? examples;
+    if (json['examples'] is Map) {
+      final raw = json['examples'] as Map;
+      examples = raw.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+    }
+
     return Word(
-      id: (json['el'] as String?) ?? '',
-      ru: (json['ru'] as String?) ?? '',
-      el: (json['el'] as String?) ?? '',
-      en: json['en'] as String?,
-      transcription: (json['transcription'] as String?) ?? '',
-      partOfSpeech: json['part_of_speech'] as String?,
+      id: id,
       dictionaryId: dictionaryId,
-      gender: json['gender'] as String?,
-      ruExample: json['ru_example'] as String?,
-      elExample: json['el_example'] as String?,
-      enExample: json['en_example'] as String?,
+      el: el,
+      ru: ru,
+      en: en,
+      transcription: transcription,
+      gender: gender,
+      examples: examples,
     );
   }
 
   String? getUsageExampleForLanguage(String langCode) {
-    return switch (langCode) {
-      'ru' => ruExample,
-      'el' => elExample,
-      'en' => enExample,
-      _ => elExample,
-    };
+    return examples?[langCode];
   }
-}
-
-@immutable
-class QuizAnswer {
-  final Word word;
-  final String userAnswer;
-  final bool isCorrect;
-
-  const QuizAnswer({
-    required this.word,
-    required this.userAnswer,
-    required this.isCorrect,
-  });
 }
