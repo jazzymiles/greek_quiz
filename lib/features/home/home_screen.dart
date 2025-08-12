@@ -6,13 +6,13 @@ import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
 import 'package:greek_quiz/features/quiz/card_view.dart';
 import 'package:greek_quiz/features/quiz/keyboard_quiz_provider.dart';
 import 'package:greek_quiz/features/quiz/keyboard_view.dart';
+import 'package:greek_quiz/features/quiz/quiz_mode.dart';
 import 'package:greek_quiz/features/quiz/quiz_provider.dart';
 import 'package:greek_quiz/features/quiz/quiz_view.dart';
 import 'package:greek_quiz/features/quiz/talk_show_view.dart';
+import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/features/settings/settings_screen.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
-
-enum QuizMode { quiz, cards, keyboard, talkShow }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -33,12 +33,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Зафиксируем стартовый режим в провайдере
+    Future.microtask(() {
+      ref.read(quizModeProvider.notifier).state = _selectedMode;
+    });
+
+    // Инициализация + автозагрузка словарей при первом запуске
     Future.microtask(() async {
-      await ref.read(dictionaryServiceProvider).initialize();
-      // После инициализации обновляем все режимы
+      final service = ref.read(dictionaryServiceProvider);
+      final settings = ref.read(settingsProvider);
+
+      // 1) Инициализация (чтение локальных словарей/индексов)
+      await service.initialize();
+
+      // 2) Обновим режимы, чтобы подхватили локальные данные (если они есть)
       ref.read(quizProvider.notifier).refresh();
       ref.read(keyboardQuizProvider.notifier).refresh();
       ref.read(cardModeProvider.notifier).refresh();
+
+      // 3) Если активных слов нет — первый запуск: качаем словари
+      final hasWords = ref.read(cardModeProvider).activeWords.isNotEmpty;
+      if (!hasWords) {
+        await service.downloadAndSaveDictionaries(settings.interfaceLanguage);
+
+        // 4) После загрузки — снова обновляем режимы
+        ref.read(quizProvider.notifier).refresh();
+        ref.read(keyboardQuizProvider.notifier).refresh();
+        ref.read(cardModeProvider.notifier).refresh();
+      }
     });
   }
 
@@ -52,7 +75,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         Scaffold(
           resizeToAvoidBottomInset: false,
           appBar: AppBar(
-            title: const Text('Greek Quiz'),
+            leading: IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: l10n.title_settings_navigation,
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.95,
+                  child: const SettingsScreen(),
+                ),
+              ),
+            ),
+            title: null, // без заголовка
             actions: [
               IconButton(
                 icon: const Icon(Icons.library_books_outlined),
@@ -69,24 +105,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: const DictionarySelectionView(),
                     ),
                   );
-                  // ИСПРАВЛЕНИЕ: Обновляем ВСЕ ТРИ провайдера
+                  // Обновляем все три провайдера после изменения словарей
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
                   ref.read(cardModeProvider.notifier).refresh();
                 },
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                tooltip: l10n.title_settings_navigation,
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.95,
-                    child: const SettingsScreen(),
-                  ),
-                ),
               ),
             ],
           ),
@@ -110,6 +133,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     setState(() {
                       _selectedMode = newSelection.first;
                     });
+                    // уведомляем о смене режима (важно для TalkShow)
+                    ref.read(quizModeProvider.notifier).state = _selectedMode;
                   },
                 ),
               ),

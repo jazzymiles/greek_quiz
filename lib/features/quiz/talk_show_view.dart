@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:greek_quiz/data/models/word.dart';
 import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
+import 'package:greek_quiz/features/quiz/quiz_mode.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
 import 'package:greek_quiz/shared/services/tts_service.dart';
@@ -14,25 +15,56 @@ class TalkShowView extends ConsumerStatefulWidget {
   ConsumerState<TalkShowView> createState() => _TalkShowViewState();
 }
 
-class _TalkShowViewState extends ConsumerState<TalkShowView> {
+class _TalkShowViewState extends ConsumerState<TalkShowView>
+    with WidgetsBindingObserver {
   bool _isPlaying = false;
   bool _isDisposed = false;
-
-  /// Флажок, чтобы не запускать второй цикл поверх первого
   bool _cycleRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Если виджет создан, но режим уже не talkShow — сразу глушим всё.
+    if (ref.read(quizModeProvider) != QuizMode.talkShow) {
+      _forceStopAll();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _forceStopAll();
+    }
+  }
+
+  @override
+  void deactivate() {
+    // В IndexedStack виджет может стать невидимым, но не уничтоженным — выключаемся.
+    _forceStopAll();
+    super.deactivate();
+  }
 
   @override
   void dispose() {
     _isDisposed = true;
-    // Гарантированно глушим TTS при закрытии экрана
+    WidgetsBinding.instance.removeObserver(this);
     ref.read(ttsServiceProvider).stop();
     super.dispose();
   }
 
+  Future<void> _forceStopAll() async {
+    _isPlaying = false;
+    await ref.read(ttsServiceProvider).stop();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _startPlayback() async {
     if (_isPlaying) return;
+    if (ref.read(quizModeProvider) != QuizMode.talkShow) return;
+
     setState(() => _isPlaying = true);
-    // Запускаем цикл, если он ещё не крутится
     if (!_cycleRunning) {
       unawaited(_runPlaybackCycle());
     }
@@ -41,7 +73,6 @@ class _TalkShowViewState extends ConsumerState<TalkShowView> {
   Future<void> _pausePlayback() async {
     if (!_isPlaying) return;
     setState(() => _isPlaying = false);
-    // Останавливаем текущую озвучку немедленно
     await ref.read(ttsServiceProvider).stop();
   }
 
@@ -51,6 +82,11 @@ class _TalkShowViewState extends ConsumerState<TalkShowView> {
 
     try {
       while (_isPlaying && !_isDisposed) {
+        if (ref.read(quizModeProvider) != QuizMode.talkShow) {
+          await _forceStopAll();
+          break;
+        }
+
         final cardState = ref.read(cardModeProvider);
         if (cardState.activeWords.isEmpty) {
           await _pausePlayback();
@@ -66,7 +102,6 @@ class _TalkShowViewState extends ConsumerState<TalkShowView> {
         await ttsService.speak(questionText, settings.studiedLanguage);
         if (!_isPlaying || _isDisposed) break;
 
-        // короткая пауза между вопросом и ответом
         await Future.delayed(const Duration(seconds: 2));
         if (!_isPlaying || _isDisposed) break;
 
@@ -77,6 +112,10 @@ class _TalkShowViewState extends ConsumerState<TalkShowView> {
         await Future.delayed(const Duration(seconds: 2));
         if (!_isPlaying || _isDisposed) break;
 
+        if (ref.read(quizModeProvider) != QuizMode.talkShow) {
+          await _forceStopAll();
+          break;
+        }
         notifier.nextWord();
       }
     } finally {
@@ -85,8 +124,9 @@ class _TalkShowViewState extends ConsumerState<TalkShowView> {
   }
 
   Future<void> _skip(VoidCallback moveAction) async {
-    // Немедленно прерываем текущую речь, чтобы не было наложений
     await ref.read(ttsServiceProvider).stop();
+    if (ref.read(quizModeProvider) != QuizMode.talkShow) return;
+
     moveAction();
     if (_isPlaying && !_cycleRunning) {
       unawaited(_runPlaybackCycle());
@@ -108,6 +148,17 @@ class _TalkShowViewState extends ConsumerState<TalkShowView> {
 
   @override
   Widget build(BuildContext context) {
+    // Слушаем смену режима — нельзя делать это в initState для вашей версии Riverpod
+    ref.listen<QuizMode>(
+      quizModeProvider,
+          (prev, mode) {
+        if (mode != QuizMode.talkShow) {
+          // чтобы не ловить "setState during build", выполняем в микро-задаче
+          Future.microtask(_forceStopAll);
+        }
+      },
+    );
+
     final l10n = AppLocalizations.of(context)!;
     final cardState = ref.watch(cardModeProvider);
     final notifier = ref.read(cardModeProvider.notifier);
