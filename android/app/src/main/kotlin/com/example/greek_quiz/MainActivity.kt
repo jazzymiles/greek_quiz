@@ -1,5 +1,6 @@
 package com.example.greek_quiz
 
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterActivity()
+// Достаточно просто унаследоваться — без configureFlutterEngine и setActivity.
+class MainActivity : AudioServiceActivity()

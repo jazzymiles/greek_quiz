@@ -1,6 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:audio_service/audio_service.dart';
+
+import 'package:greek_quiz/core/audio/talkshow_audio_handler.dart';
 import 'package:greek_quiz/data/models/word.dart';
 import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
 import 'package:greek_quiz/features/quiz/quiz_mode.dart';
@@ -17,76 +19,53 @@ class TalkShowView extends ConsumerStatefulWidget {
 
 class _TalkShowViewState extends ConsumerState<TalkShowView>
     with WidgetsBindingObserver {
-  bool _isPlaying = false;
-  bool _isDisposed = false;
-  bool _cycleRunning = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // если виджет создан, но режим уже не talkShow — сразу глушим всё
-    if (ref.read(quizModeProvider) != QuizMode.talkShow) {
-      _forceStopAll();
-    }
-  }
+    // Подогреваем аудио-хендлер заранее
+    // ignore: discarded_futures
+    ref.read(talkShowAudioHandlerProvider.future);
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      _forceStopAll();
+    if (ref.read(quizModeProvider) != QuizMode.talkShow) {
+      _stopHandlerIfReady();
     }
   }
 
   @override
   void deactivate() {
-    // в IndexedStack виджет может стать невидимым, но не уничтоженным — выключаемся
-    _forceStopAll();
     super.deactivate();
+    if (ref.read(quizModeProvider) != QuizMode.talkShow) {
+      _stopHandlerIfReady();
+    }
   }
 
   @override
   void dispose() {
-    _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
-    ref.read(ttsServiceProvider).stop();
+    _stopHandlerIfReady();
     super.dispose();
   }
 
-  Future<void> _forceStopAll() async {
-    _isPlaying = false;
-    await ref.read(ttsServiceProvider).stop();
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _startPlayback() async {
-    if (_isPlaying) return;
-    if (ref.read(quizModeProvider) != QuizMode.talkShow) return;
-
-    setState(() => _isPlaying = true);
-    if (!_cycleRunning) {
-      unawaited(_runPlaybackCycle());
+  Future<void> _stopHandlerIfReady() async {
+    final async = ref.read(talkShowAudioHandlerProvider);
+    if (async.hasValue) {
+      await async.requireValue.stop();
     }
-  }
-
-  Future<void> _pausePlayback() async {
-    if (!_isPlaying) return;
-    setState(() => _isPlaying = false);
     await ref.read(ttsServiceProvider).stop();
   }
 
-  /// Возвращает текст для *конкретного языка* с учётом артикля (только для греческого вопроса)
-  String _textWithArticle(Word word, String langCode, {required bool includeArticle}) {
+  String _textWithArticle(Word w, String langCode, {required bool includeArticle}) {
     String base = switch (langCode) {
-      'el' => word.el,
-      'en' => word.en ?? '',
-      'ru' => word.ru,
-      _ => word.el,
+      'el' => w.el,
+      'ru' => w.ru,
+      'en' => w.en ?? '',
+      _ => w.el,
     };
 
     if (includeArticle && langCode == 'el') {
-      final g = (word.gender ?? '').toLowerCase();
+      final g = (w.gender ?? '').toLowerCase();
       String article = '';
       if (g == 'm' || g == 'м') {
         article = 'ο';
@@ -102,84 +81,14 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
     return base;
   }
 
-  Future<void> _runPlaybackCycle() async {
-    if (_cycleRunning) return;
-    _cycleRunning = true;
-
-    try {
-      while (_isPlaying && !_isDisposed) {
-        if (ref.read(quizModeProvider) != QuizMode.talkShow) {
-          await _forceStopAll();
-          break;
-        }
-
-        final cardState = ref.read(cardModeProvider);
-        if (cardState.activeWords.isEmpty) {
-          await _pausePlayback();
-          break;
-        }
-
-        final settings = ref.read(settingsProvider);
-        final ttsService = ref.read(ttsServiceProvider);
-        final notifier = ref.read(cardModeProvider.notifier);
-        final currentWord = cardState.activeWords[cardState.currentIndex];
-
-        // вопрос — studiedLanguage, учитываем артикль если включено
-        final qText = _textWithArticle(
-          currentWord,
-          settings.studiedLanguage,
-          includeArticle: settings.showArticle,
-        );
-        await ttsService.speak(qText, settings.studiedLanguage);
-        if (!_isPlaying || _isDisposed) break;
-
-        await Future.delayed(const Duration(seconds: 2));
-        if (!_isPlaying || _isDisposed) break;
-
-        // ответ — answerLanguage, БЕЗ артикля
-        final aText = _textWithArticle(
-          currentWord,
-          settings.answerLanguage,
-          includeArticle: false,
-        );
-        await ttsService.speak(aText, settings.answerLanguage);
-        if (!_isPlaying || _isDisposed) break;
-
-        await Future.delayed(const Duration(seconds: 2));
-        if (!_isPlaying || _isDisposed) break;
-
-        if (ref.read(quizModeProvider) != QuizMode.talkShow) {
-          await _forceStopAll();
-          break;
-        }
-        notifier.nextWord();
-      }
-    } finally {
-      _cycleRunning = false;
-    }
-  }
-
-  Future<void> _skip(VoidCallback moveAction) async {
-    await ref.read(ttsServiceProvider).stop();
-    if (ref.read(quizModeProvider) != QuizMode.talkShow) return;
-
-    moveAction();
-    if (_isPlaying && !_cycleRunning) {
-      unawaited(_runPlaybackCycle());
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // слушаем смену режима — в этой версии Riverpod делаем это в build()
-    ref.listen<QuizMode>(
-      quizModeProvider,
-          (prev, mode) {
-        if (mode != QuizMode.talkShow) {
-          Future.microtask(_forceStopAll);
-        }
-      },
-    );
+    // Если режим сменили — останавливаем фон
+    ref.listen<QuizMode>(quizModeProvider, (prev, next) {
+      if (next != QuizMode.talkShow) {
+        _stopHandlerIfReady();
+      }
+    });
 
     final l10n = AppLocalizations.of(context)!;
     final cardState = ref.watch(cardModeProvider);
@@ -191,23 +100,24 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
     }
 
     final currentWord = cardState.activeWords[cardState.currentIndex];
-
-    final questionText = _textWithArticle(
+    final qText = _textWithArticle(
       currentWord,
       settings.studiedLanguage,
       includeArticle: settings.showArticle,
     );
-    final answerText = _textWithArticle(
+    final aText = _textWithArticle(
       currentWord,
       settings.answerLanguage,
       includeArticle: false,
     );
-
     final studyExample =
     currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
     final answerExample =
     currentWord.getUsageExampleForLanguage(settings.answerLanguage);
     final textTheme = Theme.of(context).textTheme;
+
+    final handlerAsync = ref.watch(talkShowAudioHandlerProvider);
+    final handler = handlerAsync.value; // может быть null до инициализации
 
     return Column(
       children: [
@@ -226,18 +136,18 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
                       children: [
                         Flexible(
                           child: Text(
-                            questionText,
+                            qText,
                             style: textTheme.displaySmall,
                             textAlign: TextAlign.center,
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
-                          onPressed: () {
-                            ref.read(ttsServiceProvider).speak(
-                              questionText,
-                              settings.studiedLanguage,
-                            );
+                          icon: Icon(Icons.volume_up,
+                              color: Theme.of(context).colorScheme.primary),
+                          onPressed: () async {
+                            final tts = ref.read(ttsServiceProvider);
+                            await tts.stop();
+                            await tts.speak(qText, settings.studiedLanguage);
                           },
                         )
                       ],
@@ -247,13 +157,16 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
                           '[${currentWord.transcription}]',
-                          style: textTheme.titleLarge?.copyWith(color: Colors.grey.shade600),
+                          style: textTheme.titleLarge
+                              ?.copyWith(color: Colors.grey.shade600),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     const SizedBox(height: 24),
                     Text(
-                      answerText,
-                      style: textTheme.headlineMedium?.copyWith(color: Colors.grey.shade700),
+                      aText,
+                      style: textTheme.headlineMedium
+                          ?.copyWith(color: Colors.grey.shade700),
                       textAlign: TextAlign.center,
                     ),
                     if (studyExample != null && studyExample.isNotEmpty)
@@ -264,7 +177,8 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
                             Text(
                               studyExample,
                               style: textTheme.bodyLarge?.copyWith(
-                                  fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey.shade700),
                               textAlign: TextAlign.center,
                             ),
                             if (answerExample != null &&
@@ -274,7 +188,8 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
                                 padding: const EdgeInsets.only(top: 4.0),
                                 child: Text(
                                   answerExample,
-                                  style: textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                                  style: textTheme.bodyLarge?.copyWith(
+                                      color: Colors.grey.shade600),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
@@ -287,28 +202,59 @@ class _TalkShowViewState extends ConsumerState<TalkShowView>
             ),
           ),
         ),
+
+        // ----- Панель управления воспроизведением -----
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.skip_previous),
-                iconSize: 40,
-                onPressed: () => _skip(notifier.previousWord),
-              ),
-              IconButton(
-                icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                iconSize: 60,
-                color: Theme.of(context).colorScheme.primary,
-                onPressed: _isPlaying ? _pausePlayback : _startPlayback,
-              ),
-              IconButton(
-                icon: const Icon(Icons.skip_next),
-                iconSize: 40,
-                onPressed: () => _skip(notifier.nextWord),
-              ),
-            ],
+          child: StreamBuilder<PlaybackState>(
+            stream: handler?.playbackState,
+            builder: (context, snap) {
+              final isPlaying = snap.data?.playing ?? false;
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous),
+                    iconSize: 40,
+                    onPressed: () async {
+                      await ref.read(ttsServiceProvider).stop();
+                      // Ждём и берём ненулевой хендлер
+                      final AudioHandler h =
+                          handler ?? await ref.read(talkShowAudioHandlerProvider.future);
+                      await h.skipToPrevious();
+                      // local UI index переключается провайдером
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(isPlaying
+                        ? Icons.pause_circle_filled
+                        : Icons.play_circle_filled),
+                    iconSize: 60,
+                    color: Theme.of(context).colorScheme.primary,
+                    onPressed: () async {
+                      final AudioHandler h =
+                          handler ?? await ref.read(talkShowAudioHandlerProvider.future);
+                      if (isPlaying) {
+                        await h.pause();
+                      } else {
+                        await h.play();
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next),
+                    iconSize: 40,
+                    onPressed: () async {
+                      await ref.read(ttsServiceProvider).stop();
+                      final AudioHandler h =
+                          handler ?? await ref.read(talkShowAudioHandlerProvider.future);
+                      await h.skipToNext();
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],

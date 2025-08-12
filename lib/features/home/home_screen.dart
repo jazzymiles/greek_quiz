@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <-- добавлено
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -46,7 +47,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Future.microtask(() async {
       final prefs = await SharedPreferences.getInstance();
 
-      // === ВОССТАНОВЛЕНИЕ ЯЗЫКОВ (через существующие методы в SettingsNotifier) ===
+      // восстановление языков
       final settingsNotifier = ref.read(settingsProvider.notifier);
       final studied = prefs.getString(_prefsLangStudied);
       final answer = prefs.getString(_prefsLangAnswer);
@@ -55,11 +56,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (answer != null) settingsNotifier.updateAnswerLanguage(answer);
       if (iface != null) settingsNotifier.updateInterfaceLanguage(iface);
 
-      // === Инициализация словарей ===
+      // инициализация словарей
       final service = ref.read(dictionaryServiceProvider);
       await service.initialize();
 
-      // === ВОССТАНОВЛЕНИЕ ВЫБРАННЫХ СЛОВАРЕЙ ===
+      // выбранные словари
       final savedSelected = prefs.getStringList(_prefsSelectedDictsKey);
       if (savedSelected != null) {
         service.selectedDictionaries
@@ -68,22 +69,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         service.filterActiveWords();
       }
 
-      // === ВОССТАНОВЛЕНИЕ РЕЖИМА ===
+      // восстановим режим
       final savedModeIndex = prefs.getInt(_prefsQuizModeKey);
       if (savedModeIndex != null &&
           savedModeIndex >= 0 &&
           savedModeIndex < QuizMode.values.length) {
         _selectedMode = QuizMode.values[savedModeIndex];
       }
-      // уведомим провайдер о текущем режиме (важно для TalkShow/Keyboard)
       ref.read(quizModeProvider.notifier).state = _selectedMode;
 
-      // === Обновим режимы квиза под восстановленные данные ===
+      // обновим провайдеры
       ref.read(quizProvider.notifier).refresh();
       ref.read(keyboardQuizProvider.notifier).refresh();
       ref.read(cardModeProvider.notifier).refresh();
 
-      // === Однократная автоскачка словарей — только при наличии выбора ===
+      // однократная автозагрузка при наличии выбора
       final alreadyInstalled = prefs.getBool(_prefsDownloadedKey) ?? false;
       final hasSelection = service.selectedDictionaries.isNotEmpty;
       if (!alreadyInstalled && hasSelection) {
@@ -91,7 +91,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         await service.downloadAndSaveDictionaries(settings.interfaceLanguage);
         await prefs.setBool(_prefsDownloadedKey, true);
 
-        // обновим провайдеры после загрузки
         ref.read(quizProvider.notifier).refresh();
         ref.read(keyboardQuizProvider.notifier).refresh();
         ref.read(cardModeProvider.notifier).refresh();
@@ -124,12 +123,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 );
 
-                // Сохраняем актуальные настройки языков при закрытии экрана
+                // Сохраняем актуальные языки
                 final prefs = await SharedPreferences.getInstance();
                 final s = ref.read(settingsProvider);
                 await prefs.setString(_prefsLangStudied, s.studiedLanguage);
                 await prefs.setString(_prefsLangAnswer, s.answerLanguage);
                 await prefs.setString(_prefsLangInterface, s.interfaceLanguage);
+
+                // <<< ФИКС КЛАВИАТУРЫ ПОСЛЕ ЗАКРЫТИЯ НАСТРОЕК >>>
+                FocusManager.instance.primaryFocus?.unfocus();
+                await SystemChannels.textInput.invokeMethod('TextInput.hide');
               },
             ),
             title: null,
@@ -152,7 +155,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   );
 
-                  // После закрытия — сохраняем выбор словарей
+                  // Сохраняем выбор словарей
                   final prefs = await SharedPreferences.getInstance();
                   final service = ref.read(dictionaryServiceProvider);
                   await prefs.setStringList(
@@ -160,10 +163,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     List<String>.from(service.selectedDictionaries),
                   );
 
-                  // и обновим провайдеры
+                  // Обновим провайдеры
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
                   ref.read(cardModeProvider.notifier).refresh();
+
+                  // На всякий случай: скрыть клавиатуру и тут, если она вдруг показалась
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  await SystemChannels.textInput.invokeMethod('TextInput.hide');
                 },
               ),
             ],
@@ -188,10 +195,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     setState(() {
                       _selectedMode = newSelection.first;
                     });
-                    // уведомим о смене режима
                     ref.read(quizModeProvider.notifier).state = _selectedMode;
 
-                    // и сохраним режим
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.setInt(_prefsQuizModeKey, _selectedMode.index);
                   },
