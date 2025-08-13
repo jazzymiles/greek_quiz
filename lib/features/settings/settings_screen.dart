@@ -131,38 +131,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SectionHeader(l10n.languages_section_header),
                   _SettingsGroup(
                     children: [
-                      _PickerTile(
-                        title: l10n.interface_language_picker,
-                        value: languageMap[settings.interfaceLanguage] ?? '',
-                        onTap: () => _showPicker(
-                          context,
-                          l10n: l10n,
-                          options: languageMap,
-                          onSelected: settingsNotifier.updateInterfaceLanguage,
+                      // 1) ЯЗЫК ИНТЕРФЕЙСА — теперь тоже пикер (на всю ширину)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.interface_language_picker,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            // <<< ширина пикера
+                            SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<String>(
+                                showSelectedIcon: false,
+                                segments: <ButtonSegment<String>>[
+                                  ButtonSegment(
+                                      value: 'system',
+                                      label: Text(l10n.language_system)),
+                                  ButtonSegment(
+                                      value: 'ru',
+                                      label: Text(l10n.language_ru)),
+                                  ButtonSegment(
+                                      value: 'en',
+                                      label: Text(l10n.language_en)),
+                                  ButtonSegment(
+                                      value: 'el',
+                                      label: Text(l10n.language_el)),
+                                ],
+                                selected: {settings.interfaceLanguage},
+                                onSelectionChanged: (sel) => settingsNotifier
+                                    .updateInterfaceLanguage(sel.first),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       _divider(),
-                      _PickerTile(
-                        title: l10n.studied_language_picker,
-                        value: languageMap[settings.studiedLanguage] ?? '',
-                        onTap: () => _showPicker(
-                          context,
-                          l10n: l10n,
-                          options: languageMap,
-                          onSelected: settingsNotifier.updateStudiedLanguage,
-                          excludeSystem: true,
+
+                      // 2) ИЗУЧАЕМЫЙ ЯЗЫК — пикер на всю ширину
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.studied_language_picker,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            // <<< ширина пикера
+                            SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<String>(
+                                showSelectedIcon: false,
+                                segments: <ButtonSegment<String>>[
+                                  ButtonSegment(
+                                      value: 'el',
+                                      label: Text(l10n.language_el)),
+                                  ButtonSegment(
+                                      value: 'ru',
+                                      label: Text(l10n.language_ru)),
+                                  ButtonSegment(
+                                      value: 'en',
+                                      label: Text(l10n.language_en)),
+                                ],
+                                selected: {settings.studiedLanguage},
+                                onSelectionChanged: (sel) => settingsNotifier
+                                    .updateStudiedLanguage(sel.first),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       _divider(),
-                      _PickerTile(
-                        title: l10n.answer_language_picker,
-                        value: languageMap[settings.answerLanguage] ?? '',
-                        onTap: () => _showPicker(
-                          context,
-                          l10n: l10n,
-                          options: languageMap,
-                          onSelected: settingsNotifier.updateAnswerLanguage,
-                          excludeSystem: true,
+
+                      // 3) ЯЗЫК ОТВЕТА — пикер на всю ширину
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.answer_language_picker,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            // <<< ширина пикера
+                            SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<String>(
+                                showSelectedIcon: false,
+                                segments: <ButtonSegment<String>>[
+                                  ButtonSegment(
+                                      value: 'ru',
+                                      label: Text(l10n.language_ru)),
+                                  ButtonSegment(
+                                      value: 'el',
+                                      label: Text(l10n.language_el)),
+                                  ButtonSegment(
+                                      value: 'en',
+                                      label: Text(l10n.language_en)),
+                                ],
+                                selected: {settings.answerLanguage},
+                                onSelectionChanged: (sel) => settingsNotifier
+                                    .updateAnswerLanguage(sel.first),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -172,10 +262,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SectionHeader(l10n.appearance_section_header),
                   _SettingsGroup(
                     children: [
-                      ListTile(
-                        title: Text(l10n.theme_picker),
-                        trailing: SizedBox(
-                          width: 220,
+                      // Убрали подпись "Тема" — только SegmentedButton на всю ширину
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: SizedBox(
+                          // <<< ширина пикера
+                          width: double.infinity,
                           child: SegmentedButton<AppTheme>(
                             showSelectedIcon: false,
                             segments: [
@@ -193,8 +286,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ],
                             selected: {settings.appTheme},
-                            onSelectionChanged: (selection) =>
-                                settingsNotifier.updateAppTheme(selection.first),
+                            onSelectionChanged: (selection) => settingsNotifier
+                                .updateAppTheme(selection.first),
                           ),
                         ),
                       ),
@@ -205,35 +298,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _SectionHeader(l10n.dictionaries_section_header),
                   _SettingsGroup(
                     children: [
-                      ListTile(
-                        title: Text(l10n.dictionary_source_picker),
-                        trailing: SizedBox(
-                          width: 220,
-                          child: SegmentedButton<DictionarySource>(
-                            showSelectedIcon: false,
-                            segments: [
-                              ButtonSegment(
-                                value: DictionarySource.local, // <-- было builtIn
-                                label: Text(l10n.source_local),
+                      // Заголовок "Источник" одной строкой + переключатель под ним на всю ширину
+                      Padding(
+                        padding:
+                        const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.dictionary_source_picker,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 8),
+                            // <<< ширина пикера
+                            SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<DictionarySource>(
+                                showSelectedIcon: false,
+                                segments: [
+                                  ButtonSegment(
+                                    value: DictionarySource.local,
+                                    label: Text(l10n.source_local),
+                                  ),
+                                  ButtonSegment(
+                                    value: DictionarySource.customURL,
+                                    label: Text(l10n.source_custom),
+                                  ),
+                                ],
+                                selected: {settings.dictionarySource},
+                                onSelectionChanged: (selection) =>
+                                    settingsNotifier.updateDictionarySource(
+                                        selection.first),
                               ),
-                              ButtonSegment(
-                                value: DictionarySource.customURL,
-                                label: Text(l10n.source_custom),
-                              ),
-                            ],
-                            selected: {settings.dictionarySource},
-                            onSelectionChanged: (selection) =>
-                                settingsNotifier.updateDictionarySource(
-                                    selection.first),
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                      if (settings.dictionarySource == DictionarySource.customURL)
+
+                      if (settings.dictionarySource ==
+                          DictionarySource.customURL)
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                          padding:
+                          const EdgeInsets.fromLTRB(16, 8, 16, 12),
                           child: TextField(
                             controller: settingsNotifier.urlController,
-                            autofocus: false, // важно: не поднимать клавиатуру
+                            autofocus: false, // не поднимать клавиатуру
                             decoration: InputDecoration(
                               labelText: l10n.custom_url_label,
                               hintText: 'https://example.com/dictionary.json',
@@ -263,7 +375,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         onPressed: isDownloadButtonDisabled
                             ? null
                             : () async {
-                          // Снимем фокус, чтобы после закрытия клавиатура не всплывала
                           FocusManager.instance.primaryFocus?.unfocus();
                           await SystemChannels.textInput
                               .invokeMethod('TextInput.hide');
@@ -347,10 +458,8 @@ class _SectionHeader extends StatelessWidget {
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
           letterSpacing: 1.0,
           fontWeight: FontWeight.w700,
-          color: Theme.of(context)
-              .colorScheme
-              .onSurface
-              .withOpacity(0.65),
+          color:
+          Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
         ),
       ),
     );

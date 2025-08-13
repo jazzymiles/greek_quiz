@@ -110,60 +110,60 @@ class _KeyboardViewState extends ConsumerState<KeyboardView> {
       },
     );
 
-    return Column(
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    WordDisplay(
-                      word: currentWord,
-                      autoplayEnabled: settings.autoPlaySound,
-                    ),
-                    const SizedBox(height: 24),
-                    if (state.status == KeyboardQuizStatus.checked)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: Text(
-                          state.isCorrect ? l10n.correct_answer_feedback : correctAnswer,
-                          style: TextStyle(
-                            color: state.isCorrect
-                                ? Colors.green
-                                : Theme.of(context).colorScheme.error,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    // Поле ввода с нужной локалью клавиатуры
-                    Localizations.override(
-                      context: context,
-                      locale: _localeForAnswerLang(settings.answerLanguage),
-                      child: inputField,
-                    ),
-                  ],
+    // === Вёрстка как в QuizView: контент со скроллом и кнопка внутри ниже поля ===
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          WordDisplay(
+            word: currentWord,
+            autoplayEnabled: settings.autoPlaySound,
+          ),
+          // Блок фидбэка фиксированной высоты — визуально как в квизе
+          Container(
+            height: 120,
+            alignment: Alignment.center,
+            child: (state.status == KeyboardQuizStatus.checked)
+                ? Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                state.isCorrect
+                    ? l10n.correct_answer_feedback
+                    : correctAnswer,
+                style: TextStyle(
+                  color: state.isCorrect
+                      ? Colors.green
+                      : Theme.of(context).colorScheme.error,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                 ),
+                textAlign: TextAlign.center,
+              ),
+            )
+                : const SizedBox.shrink(),
+          ),
+          // Поле ввода с нужной локалью клавиатуры
+          Localizations.override(
+            context: context,
+            locale: _localeForAnswerLang(settings.answerLanguage),
+            child: inputField,
+          ),
+          const SizedBox(height: 40),
+
+          // Кнопка проверки — так же, как в QuizView (по центру, фиксированная ширина)
+          Center(
+            child: SizedBox(
+              width: 250,
+              height: 50,
+              child: FilledButton(
+                onPressed: onPressed,
+                child: Text(buttonText),
               ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton(
-              onPressed: onPressed,
-              child: Text(buttonText),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

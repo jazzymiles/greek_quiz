@@ -90,16 +90,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get keyboard_mode_title => 'Я напишу';
 
   @override
-  String get language_el => 'Греческий';
+  String get language_el => 'Ελληνικά';
 
   @override
-  String get language_en => 'Английский';
+  String get language_en => 'English';
 
   @override
   String get language_ru => 'Русский';
 
   @override
-  String get language_system => 'Системный';
+  String get language_system => 'Система';
 
   @override
   String get languages_section_header => 'ЯЗЫКИ';
@@ -145,7 +145,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sound_section_header => 'ЗВУК';
 
   @override
-  String get source_custom => 'Пользовательский URL';
+  String get source_custom => 'Свой URL';
 
   @override
   String get source_local => 'Встроенный';
@@ -315,7 +315,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get languageOptionRussian => 'Русский';
 
   @override
-  String get languageOptionSystem => 'Системный';
+  String get languageOptionSystem => 'Система';
 
   @override
   String get languageSettingsSection => 'Языки';
