@@ -16,13 +16,19 @@ class KeyboardQuizState {
   const KeyboardQuizState({
     this.currentWord,
     this.status = KeyboardQuizStatus.asking,
-    this.userAnswer = "",
+    this.userAnswer = '',
     this.isCorrect = false,
   });
 
-  KeyboardQuizState copyWith({Word? currentWord, KeyboardQuizStatus? status, String? userAnswer, bool? isCorrect}) {
+  KeyboardQuizState copyWith({
+    Word? currentWord,
+    KeyboardQuizStatus? status,
+    String? userAnswer,
+    bool? isCorrect,
+    bool clearWord = false,
+  }) {
     return KeyboardQuizState(
-      currentWord: currentWord ?? this.currentWord,
+      currentWord: clearWord ? null : (currentWord ?? this.currentWord),
       status: status ?? this.status,
       userAnswer: userAnswer ?? this.userAnswer,
       isCorrect: isCorrect ?? this.isCorrect,
@@ -31,12 +37,18 @@ class KeyboardQuizState {
 }
 
 class KeyboardQuizNotifier extends StateNotifier<KeyboardQuizState> {
-  final Ref _ref;
-  late final TextEditingController textController;
-
   KeyboardQuizNotifier(this._ref) : super(const KeyboardQuizState()) {
-    textController = TextEditingController();
+    textController.addListener(() {
+      final text = textController.text;
+      if (text != state.userAnswer) {
+        state = state.copyWith(userAnswer: text);
+      }
+    });
+    refresh();
   }
+
+  final Ref _ref;
+  final TextEditingController textController = TextEditingController();
 
   @override
   void dispose() {
@@ -44,45 +56,128 @@ class KeyboardQuizNotifier extends StateNotifier<KeyboardQuizState> {
     super.dispose();
   }
 
-  String _getWordField(Word word, String langCode) {
-    return switch (langCode) { 'el' => word.el, 'en' => word.en ?? '', 'ru' => word.ru, _ => word.el };
-  }
-
   void refresh() {
     _ref.read(dictionaryServiceProvider).filterActiveWords();
     generateNewQuestion();
   }
 
+  String _getWordField(Word word, String langCode) {
+    switch (langCode) {
+      case 'el':
+        return word.el;
+      case 'en':
+        return word.en ?? '';
+      case 'ru':
+        return word.ru;
+      default:
+        return word.el;
+    }
+  }
+
+  // ------ Нормализация / варианты ответа ------
+
+  String _normalize(String s) {
+    const accents = {
+      'ά': 'α', 'έ': 'ε', 'ή': 'η', 'ί': 'ι', 'ό': 'ο', 'ύ': 'υ', 'ώ': 'ω',
+      'ϊ': 'ι', 'ΐ': 'ι', 'ϋ': 'υ', 'ΰ': 'υ', 'ς': 'σ',
+      'Ά': 'α', 'Έ': 'ε', 'Ή': 'η', 'Ί': 'ι', 'Ό': 'ο', 'Ύ': 'υ', 'Ώ': 'ω',
+      'Ϊ': 'ι', 'Ϋ': 'υ',
+    };
+    final buf = StringBuffer();
+    for (final ch in s.toLowerCase().trim().runes) {
+      final c = String.fromCharCode(ch);
+      buf.write(accents[c] ?? c);
+    }
+    return buf.toString()
+        .replaceAll(RegExp(r'[^\p{Letter}\p{Number}\s]', unicode: true), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  List<String> _splitVariants(String s) {
+    return s
+        .split(RegExp(r'(,|;|/|\\| or | либо | или )', caseSensitive: false))
+        .map((e) => _normalize(e))
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  bool _isAnswerCorrect({
+    required String userInput,
+    required Word word,
+    required String answerLang,
+  }) {
+    final u = _normalize(userInput);
+    if (u.isEmpty) return false;
+
+    late final List<String> variants;
+    switch (answerLang) {
+      case 'el':
+        variants = [_normalize(word.el)];
+        break;
+      case 'ru':
+        variants = _splitVariants(word.ru);
+        break;
+      case 'en':
+        variants = _splitVariants(word.en ?? '');
+        break;
+      default:
+        variants = [_normalize(word.el)];
+    }
+
+    // строгое сравнение без «почти правильно»
+    return variants.any((v) => v == u);
+  }
+
+  // ------ Логика квиза ------
+
   void generateNewQuestion() {
     final dictionaryService = _ref.read(dictionaryServiceProvider);
     final word = dictionaryService.getRandomWord();
-    textController.clear();
-    state = KeyboardQuizState(currentWord: word);
-  }
-
-  void checkAnswer() {
-    if (state.currentWord == null) return;
-    final settings = _ref.read(settingsProvider);
-    final correctAnswer = _getWordField(state.currentWord!, settings.answerLanguage);
-    final isCorrect = textController.text.trim().toLowerCase() == correctAnswer.toLowerCase();
-
-    state = state.copyWith(
-      status: KeyboardQuizStatus.checked,
-      userAnswer: textController.text.trim(),
-      isCorrect: isCorrect,
+    textController.text = '';
+    if (word == null) {
+      state = state.copyWith(
+        clearWord: true,
+        status: KeyboardQuizStatus.asking,
+        userAnswer: '',
+        isCorrect: false,
+      );
+      return;
+    }
+    state = KeyboardQuizState(
+      currentWord: word,
+      status: KeyboardQuizStatus.asking,
+      userAnswer: '',
+      isCorrect: false,
     );
   }
 
-  void showAnswer() {
-    if (state.currentWord == null) return;
+  void checkAnswer() {
+    final w = state.currentWord;
+    if (w == null) return;
+
     final settings = _ref.read(settingsProvider);
-    final correctAnswer = _getWordField(state.currentWord!, settings.answerLanguage);
-    textController.text = correctAnswer;
-    state = state.copyWith(userAnswer: correctAnswer);
+    final ok = _isAnswerCorrect(
+      userInput: state.userAnswer,
+      word: w,
+      answerLang: settings.answerLanguage,
+    );
+
+    state = state.copyWith(status: KeyboardQuizStatus.checked, isCorrect: ok);
+  }
+
+  void showAnswer() {
+    final w = state.currentWord;
+    if (w == null) return;
+    final settings = _ref.read(settingsProvider);
+    final answer = _getWordField(w, settings.answerLanguage);
+    textController.text = answer;
+    state = state.copyWith(userAnswer: answer);
   }
 }
 
-final keyboardQuizProvider = StateNotifierProvider.autoDispose<KeyboardQuizNotifier, KeyboardQuizState>((ref) {
+final keyboardQuizProvider =
+StateNotifierProvider.autoDispose<KeyboardQuizNotifier, KeyboardQuizState>((ref) {
   final notifier = KeyboardQuizNotifier(ref);
   ref.onDispose(() => notifier.dispose());
   return notifier;

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // <-- добавлено
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:greek_quiz/data/services/dictionary_service.dart';
 import 'package:greek_quiz/features/dictionary/dictionary_selection_view.dart';
@@ -9,13 +7,16 @@ import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
 import 'package:greek_quiz/features/quiz/card_view.dart';
 import 'package:greek_quiz/features/quiz/keyboard_quiz_provider.dart';
 import 'package:greek_quiz/features/quiz/keyboard_view.dart';
-import 'package:greek_quiz/features/quiz/quiz_mode.dart';
 import 'package:greek_quiz/features/quiz/quiz_provider.dart';
 import 'package:greek_quiz/features/quiz/quiz_view.dart';
 import 'package:greek_quiz/features/quiz/talk_show_view.dart';
-import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/features/settings/settings_screen.dart';
+import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
+import 'package:greek_quiz/features/quiz/quiz_mode.dart';
+
+// Базовый URL твоего индекса словарей
+const String kDictionariesIndexUrl = 'https://redinger.cc/greekquiz/settings.txt';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,14 +25,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  // prefs keys
-  static const _prefsDownloadedKey = 'dicts_installed_v1';
-  static const _prefsSelectedDictsKey = 'selected_dictionaries_v1';
-  static const _prefsQuizModeKey = 'quiz_mode_v1';
-  static const _prefsLangStudied = 'settings.studiedLanguage';
-  static const _prefsLangAnswer = 'settings.answerLanguage';
-  static const _prefsLangInterface = 'settings.interfaceLanguage';
-
   QuizMode _selectedMode = QuizMode.quiz;
 
   static const List<Widget> _quizViews = <Widget>[
@@ -44,57 +37,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() async {
-      final prefs = await SharedPreferences.getInstance();
+    // Инициализация + попытка автозагрузки при первом запуске
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final svc = ref.read(dictionaryServiceProvider);
+      final settings = ref.read(settingsProvider);
 
-      // восстановление языков
-      final settingsNotifier = ref.read(settingsProvider.notifier);
-      final studied = prefs.getString(_prefsLangStudied);
-      final answer = prefs.getString(_prefsLangAnswer);
-      final iface = prefs.getString(_prefsLangInterface);
-      if (studied != null) settingsNotifier.updateStudiedLanguage(studied);
-      if (answer != null) settingsNotifier.updateAnswerLanguage(answer);
-      if (iface != null) settingsNotifier.updateInterfaceLanguage(iface);
+      await svc.initializeWithBootstrap(
+        interfaceLanguage: settings.interfaceLanguage,
+        indexUrlIfBootstrap: kDictionariesIndexUrl,
+      );
 
-      // инициализация словарей
-      final service = ref.read(dictionaryServiceProvider);
-      await service.initialize();
-
-      // выбранные словари
-      final savedSelected = prefs.getStringList(_prefsSelectedDictsKey);
-      if (savedSelected != null) {
-        service.selectedDictionaries
-          ..clear()
-          ..addAll(savedSelected);
-        service.filterActiveWords();
-      }
-
-      // восстановим режим
-      final savedModeIndex = prefs.getInt(_prefsQuizModeKey);
-      if (savedModeIndex != null &&
-          savedModeIndex >= 0 &&
-          savedModeIndex < QuizMode.values.length) {
-        _selectedMode = QuizMode.values[savedModeIndex];
-      }
-      ref.read(quizModeProvider.notifier).state = _selectedMode;
-
-      // обновим провайдеры
+      // После инициализации обновляем режимы
       ref.read(quizProvider.notifier).refresh();
       ref.read(keyboardQuizProvider.notifier).refresh();
       ref.read(cardModeProvider.notifier).refresh();
-
-      // однократная автозагрузка при наличии выбора
-      final alreadyInstalled = prefs.getBool(_prefsDownloadedKey) ?? false;
-      final hasSelection = service.selectedDictionaries.isNotEmpty;
-      if (!alreadyInstalled && hasSelection) {
-        final settings = ref.read(settingsProvider);
-        await service.downloadAndSaveDictionaries(settings.interfaceLanguage);
-        await prefs.setBool(_prefsDownloadedKey, true);
-
-        ref.read(quizProvider.notifier).refresh();
-        ref.read(keyboardQuizProvider.notifier).refresh();
-        ref.read(cardModeProvider.notifier).refresh();
-      }
     });
   }
 
@@ -102,45 +58,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final dictionaryService = ref.watch(dictionaryServiceProvider);
+    final settings = ref.watch(settingsProvider);
+
+    // Нужно ли показать "первичную заглушку": словарей ещё нет и загрузка не идёт
+    final bool needsFirstDownloadCta =
+        !dictionaryService.isDownloading && dictionaryService.availableDictionaries.isEmpty;
 
     return Stack(
       children: [
         Scaffold(
           resizeToAvoidBottomInset: false,
           appBar: AppBar(
+            title: null, // без названия приложения
+            centerTitle: false,
             leading: IconButton(
               icon: const Icon(Icons.settings_outlined),
               tooltip: l10n.title_settings_navigation,
               onPressed: () async {
+                // спрятать клавиатуру при входе в настройки
+                FocusScope.of(context).unfocus();
                 await showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
-                  useSafeArea: true,
                   backgroundColor: Colors.transparent,
-                  builder: (context) => FractionallySizedBox(
-                    heightFactor: 0.95,
+                  builder: (context) => SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.95,
                     child: const SettingsScreen(),
                   ),
                 );
-
-                // Сохраняем актуальные языки
-                final prefs = await SharedPreferences.getInstance();
-                final s = ref.read(settingsProvider);
-                await prefs.setString(_prefsLangStudied, s.studiedLanguage);
-                await prefs.setString(_prefsLangAnswer, s.answerLanguage);
-                await prefs.setString(_prefsLangInterface, s.interfaceLanguage);
-
-                // <<< ФИКС КЛАВИАТУРЫ ПОСЛЕ ЗАКРЫТИЯ НАСТРОЕК >>>
-                FocusManager.instance.primaryFocus?.unfocus();
-                await SystemChannels.textInput.invokeMethod('TextInput.hide');
+                // после закрытия — ещё раз спрятать
+                FocusScope.of(context).unfocus();
               },
             ),
-            title: null,
             actions: [
               IconButton(
                 icon: const Icon(Icons.library_books_outlined),
                 tooltip: l10n.select_dictionaries_title,
                 onPressed: () async {
+                  FocusScope.of(context).unfocus();
+
+                  await ref.read(dictionaryServiceProvider).ensureAvailableLoaded();
+
                   await showModalBottomSheet(
                     context: context,
                     isScrollControlled: true,
@@ -155,22 +113,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   );
 
-                  // Сохраняем выбор словарей
-                  final prefs = await SharedPreferences.getInstance();
-                  final service = ref.read(dictionaryServiceProvider);
-                  await prefs.setStringList(
-                    _prefsSelectedDictsKey,
-                    List<String>.from(service.selectedDictionaries),
-                  );
-
-                  // Обновим провайдеры
+                  // Обновляем провайдеры после изменения словарей
                   ref.read(quizProvider.notifier).refresh();
                   ref.read(keyboardQuizProvider.notifier).refresh();
                   ref.read(cardModeProvider.notifier).refresh();
 
-                  // На всякий случай: скрыть клавиатуру и тут, если она вдруг показалась
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  await SystemChannels.textInput.invokeMethod('TextInput.hide');
+                  FocusScope.of(context).unfocus();
                 },
               ),
             ],
@@ -191,14 +139,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ButtonSegment(value: QuizMode.talkShow, label: Text(l10n.talk_show_mode_title)),
                   ],
                   selected: {_selectedMode},
-                  onSelectionChanged: (Set<QuizMode> newSelection) async {
+                  onSelectionChanged: (Set<QuizMode> newSelection) {
                     setState(() {
                       _selectedMode = newSelection.first;
                     });
-                    ref.read(quizModeProvider.notifier).state = _selectedMode;
-
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setInt(_prefsQuizModeKey, _selectedMode.index);
+                    // При выходе из режима клавиатуры — прячем клавиатуру
+                    if (_selectedMode != QuizMode.keyboard) {
+                      FocusScope.of(context).unfocus();
+                    }
                   },
                 ),
               ),
@@ -211,6 +159,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
+
+        // Оверлей прогресса загрузки словарей
         if (dictionaryService.isDownloading)
           Container(
             color: Colors.black.withOpacity(0.7),
@@ -232,6 +182,89 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       if (dictionaryService.downloadProgress > 0)
                         LinearProgressIndicator(value: dictionaryService.downloadProgress),
                     ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Первая загрузка: нет словарей и не идёт скачивание → покажем понятный CTA
+        if (needsFirstDownloadCta)
+          Positioned.fill(
+            child: Container(
+              color: Theme.of(context).colorScheme.surface,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.wifi_off, size: 48, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 16),
+                        // Используем существующие ключи локализации статуса ошибки
+                        Text(
+                          l10n.getString('download_error'),
+                          style: Theme.of(context).textTheme.titleLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          // Короткое объяснение без новых ключей (нейтрально)
+                          // Можно заменить на свой текст в ARB позже.
+                          'No dictionaries available. Check your internet connection and try again.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.75),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FilledButton.icon(
+                              icon: const Icon(Icons.download),
+                              // Не создаём новый ключ. Можно позже заменить на локализованный.
+                              label: const Text('Download dictionaries'),
+                              onPressed: () async {
+                                final svc = ref.read(dictionaryServiceProvider);
+                                try {
+                                  await svc.downloadAndSaveDictionaries(
+                                    settings.interfaceLanguage,
+                                    indexUrl: kDictionariesIndexUrl,
+                                  );
+                                  // после загрузки — обновить провайдеры
+                                  ref.read(quizProvider.notifier).refresh();
+                                  ref.read(keyboardQuizProvider.notifier).refresh();
+                                  ref.read(cardModeProvider.notifier).refresh();
+                                } catch (_) {
+                                  // Ошибка уже отражена через statusMessage/download_error
+                                }
+                              },
+                            ),
+                            const SizedBox(width: 12),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.settings_outlined),
+                              label: Text(l10n.title_settings_navigation),
+                              onPressed: () async {
+                                FocusScope.of(context).unfocus();
+                                await showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) => SizedBox(
+                                    height: MediaQuery.of(context).size.height * 0.95,
+                                    child: const SettingsScreen(),
+                                  ),
+                                );
+                                FocusScope.of(context).unfocus();
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

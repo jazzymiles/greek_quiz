@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:greek_quiz/data/models/dictionary_info.dart';
 import 'package:greek_quiz/data/services/dictionary_service.dart';
@@ -18,15 +17,16 @@ class DictionarySelectionView extends ConsumerStatefulWidget {
 
 class _DictionarySelectionViewState
     extends ConsumerState<DictionarySelectionView> {
-  static const _prefsSelectedDictsKey = 'selected_dictionaries_v1';
+  bool _ensured = false;
 
-  Future<void> _saveSelection() async {
-    final prefs = await SharedPreferences.getInstance();
-    final service = ref.read(dictionaryServiceProvider);
-    await prefs.setStringList(
-      _prefsSelectedDictsKey,
-      List<String>.from(service.selectedDictionaries),
-    );
+  @override
+  void initState() {
+    super.initState();
+    // гарантия загрузки списка один раз
+    Future.microtask(() async {
+      await ref.read(dictionaryServiceProvider).ensureAvailableLoaded();
+      if (mounted) setState(() => _ensured = true);
+    });
   }
 
   @override
@@ -47,7 +47,7 @@ class _DictionarySelectionViewState
 
     final hasSelection = service.selectedDictionaries.isNotEmpty;
 
-    // Заголовок — компактный
+    // Заголовок — компактнее
     final baseTitle = Theme.of(context).textTheme.headlineMedium;
     final tinyTitle = baseTitle?.copyWith(
       fontSize: (baseTitle?.fontSize ?? 24) * 0.8,
@@ -71,7 +71,6 @@ class _DictionarySelectionViewState
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
                 child: Row(
                   children: [
-                    // Баланс слева, чтобы центрирование было честным
                     const SizedBox(width: 64),
                     Expanded(
                       child: Center(
@@ -82,11 +81,7 @@ class _DictionarySelectionViewState
                       ),
                     ),
                     TextButton(
-                      onPressed: () async {
-                        service.filterActiveWords();
-                        await _saveSelection();
-                        if (mounted) Navigator.of(context).maybePop();
-                      },
+                      onPressed: () => Navigator.of(context).maybePop(),
                       child: Text(l10n.button_done),
                     ),
                   ],
@@ -95,33 +90,38 @@ class _DictionarySelectionViewState
 
               const SizedBox(height: 4),
 
+              // Заглушка загрузки списка
+              if (!_ensured && available.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
               // Облако "чипов" со словарями
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 0,
-                    children: [
-                      for (final d in available)
-                        ChoiceChip(
-                          label: Text(locName(d)),
-                          selected: service.selectedDictionaries.contains(d.file),
-                          onSelected: (_) async {
-                            service.toggleDictionarySelection(d.file);
-                            service.filterActiveWords();
-                            await _saveSelection(); // автосейв на каждый тап
-                            setState(() {}); // обновим кнопку "Words list"
-                          },
-                        ),
-                    ],
+              if (available.isNotEmpty)
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 0,
+                      children: [
+                        for (final d in available)
+                          ChoiceChip(
+                            label: Text(locName(d)),
+                            selected: service.selectedDictionaries.contains(d.file),
+                            onSelected: (_) {
+                              service.toggleDictionarySelection(d.file);
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
               const SizedBox(height: 8),
 
-              // Кнопка "Words list" — перед открытием перечитываем активные слова
+              // Кнопка "Words list"
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: SafeArea(
@@ -133,11 +133,9 @@ class _DictionarySelectionViewState
                       onPressed: hasSelection
                           ? () async {
                         service.filterActiveWords();
-                        await _saveSelection();
                         await showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
-                          useSafeArea: true,
                           backgroundColor: Colors.transparent,
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.vertical(

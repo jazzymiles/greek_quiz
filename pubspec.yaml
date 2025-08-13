@@ -27,10 +27,6 @@ dependencies:
 flutter:
   uses-material-design: true
   generate: true
-  assets:
-    - assets/sample_data/my_words_3.json
-    - assets/sample_data/objects.json
-    - assets/sample_data/settings.json
 
 dependency_overrides:
   characters: ^1.4.1

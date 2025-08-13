@@ -1,7 +1,7 @@
 import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:greek_quiz/data/models/word.dart';
@@ -23,15 +23,14 @@ final talkShowAudioHandlerProvider = FutureProvider<AudioHandler>((ref) async {
   return handler;
 });
 
-/// Реализация управления из шторки/наушников для режима Talk Show.
-class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
+class TalkShowAudioHandler extends BaseAudioHandler
+    with QueueHandler, SeekHandler {
   final Ref ref;
   bool _isDisposed = false;
   bool _loopRunning = false;
   Timer? _betweenPartsDelay;
 
   TalkShowAudioHandler(this.ref) {
-    // кнопки, доступные на локскрине
     playbackState.add(playbackState.value.copyWith(
       controls: const [
         MediaControl.skipToPrevious,
@@ -49,7 +48,8 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
 
   Future<void> _activateSessionForBackground() async {
     final s = await _session();
-    // ВАЖНО: playback-конфигурация, чтобы iOS не «гасил» звук на залоченном экране
+    // Для TTS можно использовать speech/music; оставим music из-за локскрина,
+    // но TtsService сам активирует сессию перед speak.
     await s.configure(const AudioSessionConfiguration.music());
     await s.setActive(true);
   }
@@ -58,8 +58,6 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
     final s = await _session();
     await s.setActive(false);
   }
-
-  // == Публичные действия, которые дергаются UI/наушниками ==
 
   @override
   Future<void> play() async {
@@ -83,7 +81,6 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
 
   @override
   Future<void> pause() async {
-    // Останавливаем текущую озвучку и ставим паузу
     await ref.read(ttsServiceProvider).stop();
     _betweenPartsDelay?.cancel();
 
@@ -123,7 +120,6 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
     _betweenPartsDelay?.cancel();
     await ref.read(ttsServiceProvider).stop();
     ref.read(cardModeProvider.notifier).nextWord();
-    // если мы в play — сразу продолжаем цикл на следующем слове
     if (playbackState.value.playing && !_loopRunning) {
       _loopRunning = true;
       unawaited(_loop());
@@ -141,7 +137,6 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
     }
   }
 
-  // == Основной цикл воспроизведения вопрос/ответ ===
   Future<void> _loop() async {
     if (!_loopRunning || _isDisposed) return;
 
@@ -157,7 +152,6 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
         final tts = ref.read(ttsServiceProvider);
         final current = state.activeWords[state.currentIndex];
 
-        // Обновляем «Now Playing» (локскрин)
         mediaItem.add(
           MediaItem(
             id: current.id,
@@ -167,7 +161,7 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
           ),
         );
 
-        // Вопрос
+        // Вопрос (например, греческий)
         await tts.speak(
           _qText(current, settings, includeArticle: settings.showArticle),
           settings.studiedLanguage,
@@ -175,9 +169,10 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
         if (!_loopRunning || _isDisposed) break;
 
         // Пауза между вопросом и ответом
-        if (!_awaitDelay(const Duration(seconds: 2))) break;
+        await _delay(const Duration(seconds: 2));
+        if (!_loopRunning || _isDisposed) break;
 
-        // Ответ
+        // Ответ (например, русский/английский)
         await tts.speak(
           _aText(current, settings),
           settings.answerLanguage,
@@ -185,7 +180,8 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
         if (!_loopRunning || _isDisposed) break;
 
         // Пауза перед следующим словом
-        if (!_awaitDelay(const Duration(seconds: 2))) break;
+        await _delay(const Duration(seconds: 2));
+        if (!_loopRunning || _isDisposed) break;
 
         // Следующее слово
         ref.read(cardModeProvider.notifier).nextWord();
@@ -195,12 +191,11 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
     }
   }
 
-  bool _awaitDelay(Duration d) {
+  Future<void> _delay(Duration d) async {
+    _betweenPartsDelay?.cancel();
     final c = Completer<void>();
     _betweenPartsDelay = Timer(d, () => c.complete());
-    // если во время ожидания нас поставили на паузу/остановили — выходим
-    c.future.then((_) {});
-    return !_isDisposed && _loopRunning;
+    await c.future;
   }
 
   String _qText(Word w, dynamic settings, {required bool includeArticle}) {
@@ -213,9 +208,13 @@ class TalkShowAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandl
     if (includeArticle && settings.studiedLanguage == 'el') {
       final g = (w.gender ?? '').toLowerCase();
       String art = '';
-      if (g == 'm' || g == 'м') art = 'ο';
-      else if (g == 'f' || g == 'ж') art = 'η';
-      else if (g == 'n' || g == 'ср') art = 'το';
+      if (g == 'm' || g == 'м') {
+        art = 'ο';
+      } else if (g == 'f' || g == 'ж') {
+        art = 'η';
+      } else if (g == 'n' || g == 'ср') {
+        art = 'το';
+      }
       if (art.isNotEmpty) base = '$art $base';
     }
     return base;
