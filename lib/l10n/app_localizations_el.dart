@@ -94,10 +94,10 @@ class AppLocalizationsEl extends AppLocalizations {
   String get language_el => 'Ελληνικά';
 
   @override
-  String get language_en => 'Αγγλικά';
+  String get language_en => 'Утпдшыр';
 
   @override
-  String get language_ru => 'Ρωσικά';
+  String get language_ru => 'Русский';
 
   @override
   String get language_system => 'Σύστημα';

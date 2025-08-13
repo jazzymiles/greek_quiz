@@ -265,7 +265,7 @@ abstract class AppLocalizations {
   /// No description provided for @language_el.
   ///
   /// In en, this message translates to:
-  /// **'Greek'**
+  /// **'Ελληνικά'**
   String get language_el;
 
   /// No description provided for @language_en.
@@ -277,7 +277,7 @@ abstract class AppLocalizations {
   /// No description provided for @language_ru.
   ///
   /// In en, this message translates to:
-  /// **'Russian'**
+  /// **'Русский'**
   String get language_ru;
 
   /// No description provided for @language_system.

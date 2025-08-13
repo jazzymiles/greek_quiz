@@ -91,13 +91,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keyboard_mode_title => 'I\'ll write';
 
   @override
-  String get language_el => 'Greek';
+  String get language_el => 'Ελληνικά';
 
   @override
   String get language_en => 'English';
 
   @override
-  String get language_ru => 'Russian';
+  String get language_ru => 'Русский';
 
   @override
   String get language_system => 'System';
