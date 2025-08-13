@@ -4,6 +4,7 @@ import 'package:greek_quiz/data/models/word.dart';
 import 'package:greek_quiz/features/quiz/card_mode_provider.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/shared/widgets/word_display.dart';
+import 'package:greek_quiz/l10n/app_localizations.dart';
 
 class CardView extends ConsumerWidget {
   const CardView({super.key});
@@ -13,14 +14,17 @@ class CardView extends ConsumerWidget {
     final cardState = ref.watch(cardModeProvider);
     final notifier = ref.read(cardModeProvider.notifier);
     final settings = ref.watch(settingsProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     if (cardState.activeWords.isEmpty) {
-      return const Center(child: Text("Выберите и скачайте словари"));
+      return Center(child: Text(l10n.error_no_dictionaries_selected));
     }
 
     final currentWord = cardState.activeWords[cardState.currentIndex];
-    final studyExample = currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
-    final answerExample = currentWord.getUsageExampleForLanguage(settings.answerLanguage);
+    final studyExample =
+    currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
+    final answerExample =
+    currentWord.getUsageExampleForLanguage(settings.answerLanguage);
 
     final answerText = switch (settings.answerLanguage) {
       'el' => currentWord.el,
@@ -41,19 +45,22 @@ class CardView extends ConsumerWidget {
             child: Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceVariant
+                    .withOpacity(0.3),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: AnimatedSwitcher(
                 duration: Duration.zero,
                 child: cardState.showTranslation
-                    ? _buildCardBack(context, answerText, studyExample, answerExample)
+                    ? _buildCardBack(
+                    context, answerText, studyExample, answerExample)
                     : _buildCardFront(context, currentWord),
               ),
             ),
           ),
         ),
-
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
           child: Row(
@@ -93,7 +100,12 @@ class CardView extends ConsumerWidget {
     );
   }
 
-  Widget _buildCardBack(BuildContext context, String answerText, String? studyExample, String? answerExample) {
+  Widget _buildCardBack(
+      BuildContext context,
+      String answerText,
+      String? studyExample,
+      String? answerExample,
+      ) {
     final textTheme = Theme.of(context).textTheme;
     return SizedBox.expand(
       key: ValueKey('back-$answerText'),
@@ -103,7 +115,11 @@ class CardView extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(answerText, style: textTheme.displaySmall, textAlign: TextAlign.center),
+              Text(
+                answerText,
+                style: textTheme.displaySmall,
+                textAlign: TextAlign.center,
+              ),
               if (studyExample != null && studyExample.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0),
@@ -111,15 +127,22 @@ class CardView extends ConsumerWidget {
                     children: [
                       Text(
                         studyExample,
-                        style: textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey.shade700,
+                        ),
                         textAlign: TextAlign.center,
                       ),
-                      if (answerExample != null && answerExample.isNotEmpty && answerExample != studyExample)
+                      if (answerExample != null &&
+                          answerExample.isNotEmpty &&
+                          answerExample != studyExample)
                         Padding(
                           padding: const EdgeInsets.only(top: 4.0),
                           child: Text(
                             answerExample,
-                            style: textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: Colors.grey.shade600,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ),

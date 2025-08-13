@@ -75,7 +75,7 @@ class _KeyboardViewState extends ConsumerState<KeyboardView> {
 
     final currentWord = state.currentWord;
     if (currentWord == null) {
-      return Center(child: Text(l10n.error_no_words_loaded));
+      return Center(child: Text(l10n.error_no_dictionaries_selected));
     }
 
     final correctAnswer = _getWordField(currentWord, settings.answerLanguage);
