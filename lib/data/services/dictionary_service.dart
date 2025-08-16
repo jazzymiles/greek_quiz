@@ -1,3 +1,4 @@
+// lib/data/services/dictionary_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -41,17 +42,15 @@ class DictionaryService extends ChangeNotifier {
     await _ensureDirs();
     await ensureAvailableLoaded();
     await _loadSelected();
+    // Загрузим слова для выбранных словарей (чтобы активные сразу работали)
     await _ensureWordsLoadedForSelection();
+    // И — для режима "All words" — прогрузим в кэш все словари из папки
+    await _ensureAllCachedLoaded();
     _rebuildActiveWords();
     notifyListeners();
   }
 
   /// Инициализация + автозагрузка словарей, если их нет (первый запуск).
-  ///
-  /// Сработает ТОЛЬКО если [indexUrlIfBootstrap] задан и не пуст.
-  /// Триггерим загрузку, если:
-  ///   - список доступных словарей пуст ИЛИ
-  ///   - индекс есть, но соответствующих файлов на диске нет.
   Future<void> initializeWithBootstrap({
     String interfaceLanguage = 'en',
     String? indexUrlIfBootstrap,
@@ -62,7 +61,7 @@ class DictionaryService extends ChangeNotifier {
       return; // нет URL — ничего не делаем
     }
 
-    bool needBootstrap = availableDictionaries.isEmpty ||
+    final needBootstrap = availableDictionaries.isEmpty ||
         !(await _allIndexedFilesPresent(availableDictionaries));
 
     if (needBootstrap) {
@@ -72,10 +71,11 @@ class DictionaryService extends ChangeNotifier {
           indexUrl: indexUrlIfBootstrap,
         );
       } catch (_) {
-        // тихо игнорируем; пользователь сможет скачать вручную из настроек
+        // молча: пользователь сможет скачать вручную из настроек
       } finally {
         await ensureAvailableLoaded();
         await _ensureWordsLoadedForSelection();
+        await _ensureAllCachedLoaded();
         _rebuildActiveWords();
         notifyListeners();
       }
@@ -101,7 +101,7 @@ class DictionaryService extends ChangeNotifier {
       selectedDictionaries.add(fileId);
     }
     _saveSelected(); // fire-and-forget
-    _ensureWordsLoadedForSelection(); // preload words
+    _ensureWordsLoadedForSelection(); // preload words (избранные)
     _rebuildActiveWords();
     notifyListeners();
   }
@@ -127,22 +127,26 @@ class DictionaryService extends ChangeNotifier {
     return pool.take(count).toList();
   }
 
-  /// Picks [count] wrong options, excluding [excludeWord].
-  /// If [useAllWords] and активных мало — добираем из кэша.
+  /// Picks candidates for wrong options.
+  ///
+  /// Если [useAllWords] = true — берём из *всех загруженных словарей*.
+  /// Если false — **строго** из выбранных (activeWords), без автоподмешивания.
+  /// Порядок — случайный; возвращаем до [count] элементов.
   List<Word> getQuizOptions({
     required Word excludeWord,
     bool useAllWords = false,
     int count = 3,
   }) {
-    List<Word> pool = List<Word>.from(activeWords);
+    List<Word> pool;
 
-    if (useAllWords || pool.length <= count) {
+    if (useAllWords) {
       final allCached = _allCachedWords();
-      if (allCached.isNotEmpty) {
-        pool = List<Word>.from(allCached);
-      }
+      pool = allCached.isNotEmpty ? List<Word>.from(allCached) : List<Word>.from(activeWords);
+    } else {
+      pool = List<Word>.from(activeWords);
     }
 
+    // Удалим сам правильный ответ из пула и уберём дубликаты по id
     final seen = <String>{excludeWord.id};
     final filtered = <Word>[];
     for (final w in pool) {
@@ -150,25 +154,16 @@ class DictionaryService extends ChangeNotifier {
     }
 
     filtered.shuffle(_random);
-    if (filtered.length >= count) {
-      return filtered.take(count).toList();
-    }
-    return filtered;
+    return filtered.take(count).toList();
   }
 
   // ---- Download dictionaries (remote-only) ----
 
-  /// Downloads index.json/txt and dictionaries it references into app storage.
-  ///
-  /// [indexUrl] — URL списка словарей. Поддерживаются форматы:
-  ///  - JSON-массив словарей: [{file, name_ru, name_en, name_el, filePath}]
-  ///  - JSON-объект: { "dictionaries": [ ... как выше ... ] }
-  ///  - Текст: одна запись на строку:
-  ///      1) "file.json, https://host/file.json"
-  ///      2) "https://host/file.json"
-  ///      3) "file.json, https://…, Имя RU, Name EN, Όνομα EL"
-  Future<void> downloadAndSaveDictionaries(String interfaceLanguage,
-      {String? indexUrl}) async {
+  /// Downloads index and dictionaries it references into app storage.
+  Future<void> downloadAndSaveDictionaries(
+      String interfaceLanguage, {
+        String? indexUrl,
+      }) async {
     if (indexUrl == null || indexUrl.isEmpty) {
       return; // совместимость с существующими вызовами
     }
@@ -216,13 +211,14 @@ class DictionaryService extends ChangeNotifier {
           if (r.statusCode == 200) {
             await target.writeAsBytes(r.bodyBytes);
           } else {
-            // можно логировать, но не падать из-за одного файла
+            // логировать при желании
           }
         }
       }
 
       // Обновляем внутреннее состояние
       await _fetchAvailableDictionaries();
+      await _ensureAllCachedLoaded();
       await _ensureWordsLoadedForSelection();
       _rebuildActiveWords();
 
@@ -271,8 +267,9 @@ class DictionaryService extends ChangeNotifier {
       if (line.isEmpty) continue;
       if (line.startsWith('#')) continue;
 
-      // поддержим разделители запятая/точка с запятой/таб
-      final parts = line.split(RegExp(r'\s*,\s*|\s*;\s*|\t')).where((p) => p.isNotEmpty).toList();
+      // поддержим запятая/точка с запятой/таб
+      final parts =
+      line.split(RegExp(r'\s*,\s*|\s*;\s*|\t')).where((p) => p.isNotEmpty).toList();
 
       String? file;
       String? url;
@@ -292,12 +289,14 @@ class DictionaryService extends ChangeNotifier {
 
       if (url == null || url.isEmpty) continue;
 
-      // если file отсутствует — возьмём из URL последний сегмент
+      // если file отсутствует — вытащим из URL последний сегмент
       file ??= Uri.parse(url).pathSegments.isNotEmpty
           ? Uri.parse(url).pathSegments.last
           : 'dict_${result.length + 1}.json';
 
-      final baseName = file.replaceAll('.json', '');
+      // уберём .json/.txt из базового имени
+      final baseName =
+      file.replaceAll(RegExp(r'\.(json|txt)$', caseSensitive: false), '');
       nameRu ??= baseName;
       nameEn ??= baseName;
       nameEl ??= baseName;
@@ -319,9 +318,12 @@ class DictionaryService extends ChangeNotifier {
     String filePath = (m['filePath'] ?? m['url'] ?? m['href'] ?? '').toString();
 
     // имена
-    String nameRu = (m['name_ru'] ?? m['ru'] ?? m['nameRu'] ?? m['title_ru'] ?? file).toString();
-    String nameEn = (m['name_en'] ?? m['en'] ?? m['nameEn'] ?? m['title_en'] ?? file).toString();
-    String nameEl = (m['name_el'] ?? m['el'] ?? m['nameEl'] ?? m['title_el'] ?? file).toString();
+    String nameRu =
+    (m['name_ru'] ?? m['ru'] ?? m['nameRu'] ?? m['title_ru'] ?? file).toString();
+    String nameEn =
+    (m['name_en'] ?? m['en'] ?? m['nameEn'] ?? m['title_en'] ?? file).toString();
+    String nameEl =
+    (m['name_el'] ?? m['el'] ?? m['nameEl'] ?? m['title_el'] ?? file).toString();
 
     if (file.isEmpty) {
       // если file не задан — вытащим из URL
@@ -333,7 +335,8 @@ class DictionaryService extends ChangeNotifier {
       }
     }
 
-    final baseName = file.replaceAll('.json', '');
+    final baseName =
+    file.replaceAll(RegExp(r'\.(json|txt)$', caseSensitive: false), '');
     nameRu = nameRu.isEmpty ? baseName : nameRu;
     nameEn = nameEn.isEmpty ? baseName : nameEn;
     nameEl = nameEl.isEmpty ? baseName : nameEl;
@@ -368,14 +371,69 @@ class DictionaryService extends ChangeNotifier {
       if (await file.exists()) {
         final raw = await file.readAsString();
         final decoded = jsonDecode(raw);
+
+        // Поддержка и списка, и обёртки {"words":[...]}
+        final List list;
         if (decoded is List) {
-          _wordsCache[id] = decoded
-              .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), id))
-              .toList();
+          list = decoded;
+        } else if (decoded is Map && decoded['words'] is List) {
+          list = decoded['words'] as List;
         } else {
           _wordsCache[id] = const <Word>[];
+          continue;
         }
+
+        _wordsCache[id] = list
+            .whereType<Map>()
+            .map((e) => Word.fromJson(Map<String, dynamic>.from(e), id))
+            .toList();
       } else {
+        _wordsCache[id] = const <Word>[];
+      }
+    }
+  }
+
+  /// Грузим **все** словари из папки в кэш (для режима "All words").
+  Future<void> _ensureAllCachedLoaded() async {
+    final dir = await _dictionariesDir();
+    if (!await dir.exists()) return;
+
+    final files = dir
+        .listSync()
+        .whereType<File>()
+        .where((f) {
+      final name = f.uri.pathSegments.last.toLowerCase();
+      // .json и .txt; исключаем служебные index/selected
+      final isDataFile = name.endsWith('.json') || name.endsWith('.txt');
+      final isService =
+          name == 'index.json' || name == 'selected.json' || name == 'index.txt' || name == 'selected.txt';
+      return isDataFile && !isService;
+    })
+        .toList();
+
+    for (final f in files) {
+      final id = f.uri.pathSegments.last; // имя файла — наш dictionaryId
+      if (_wordsCache.containsKey(id)) continue;
+
+      try {
+        final raw = await f.readAsString();
+        final decoded = jsonDecode(raw);
+
+        final List list;
+        if (decoded is List) {
+          list = decoded;
+        } else if (decoded is Map && decoded['words'] is List) {
+          list = decoded['words'] as List;
+        } else {
+          _wordsCache[id] = const <Word>[];
+          continue;
+        }
+
+        _wordsCache[id] = list
+            .whereType<Map>()
+            .map((e) => Word.fromJson(Map<String, dynamic>.from(e), id))
+            .toList();
+      } catch (e) {
         _wordsCache[id] = const <Word>[];
       }
     }
@@ -400,15 +458,20 @@ class DictionaryService extends ChangeNotifier {
         list = [];
       }
     } else {
-      // Fallback: просканировать папку на *.json (кроме служебных)
+      // Fallback: просканировать папку на *.json и *.txt (кроме служебных)
       if (await dir.exists()) {
         final entries = dir
             .listSync()
             .whereType<File>()
-            .where((f) => f.path.toLowerCase().endsWith('.json'));
+            .where((f) {
+          final name = f.uri.pathSegments.last.toLowerCase();
+          final isDataFile = name.endsWith('.json') || name.endsWith('.txt');
+          final isService =
+              name == 'index.json' || name == 'selected.json' || name == 'index.txt' || name == 'selected.txt';
+          return isDataFile && !isService;
+        });
         for (final f in entries) {
           final name = f.uri.pathSegments.last;
-          if (name == 'index.json' || name == 'selected.json') continue;
           list.add(DictionaryInfo(
             file: name,
             nameRu: name,
