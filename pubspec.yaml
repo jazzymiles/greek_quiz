@@ -24,9 +24,28 @@ dependencies:
   cupertino_icons: ^1.0.6
   flutter_lints: ^3.0.0
 
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.1
+
 flutter:
   uses-material-design: true
   generate: true
+
+# ИКОНКА
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/icon/app_icon.png
+  remove_alpha_ios: true
+
+# СПЛЭШ (убираем логотип Flutter — чистый фон)
+flutter_native_splash:
+  android: true
+  ios: true
+  color: "#FFFFFF"
+  android_12:
+    color: "#FFFFFF"
 
 dependency_overrides:
   characters: ^1.4.1

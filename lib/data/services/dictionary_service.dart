@@ -675,6 +675,32 @@ class DictionaryService extends ChangeNotifier {
     }
   }
 
+  /// Локальный хелпер: клонирует слово и подменяет dictionaryId на favoritesFile.
+  Word _asFavorite(Word w) {
+    // 1) copyWith(dictionaryId: ...)
+    try {
+      final dynamic dyn = w;
+      final Word clone = dyn.copyWith(dictionaryId: favoritesFile) as Word;
+      return clone;
+    } catch (e) {
+      _log('_asFavorite(): copyWith not available ($e), try toJson/fromJson');
+    }
+
+    // 2) toJson -> fromJson + новый dictionaryId
+    try {
+      final dynamic dyn = w;
+      final Map<String, dynamic> m =
+      Map<String, dynamic>.from(dyn.toJson() as Map);
+      final Word clone = Word.fromJson(m, favoritesFile);
+      return clone;
+    } catch (e) {
+      _log('_asFavorite(): toJson/fromJson failed ($e), return original');
+    }
+
+    // 3) fallback — вернём оригинал (худший случай: не сгруппируется)
+    return w;
+  }
+
   /// Прочитать список слов из файла словаря (несколько форматов)
   Future<List<Word>> _readWordsListFromFile(File f, String dictionaryId) async {
     final raw = await f.readAsString();
@@ -699,7 +725,7 @@ class DictionaryService extends ChangeNotifier {
       return res;
     }
 
-    // избранное как словарь — обрабатывается отдельным методом, сюда обычно не попадём
+    // избранное как ids -> резолвим только по уже загруженным словам и ПЕРЕПИСЫВАЕМ dictionaryId на favoritesFile
     if (dictionaryId == favoritesFile && decoded is Map && decoded['ids'] is List) {
       final ids = (decoded['ids'] as List).whereType<String>().toList();
       _log('_readWordsListFromFile("$dictionaryId"): ids format -> count=${ids.length}');
@@ -707,7 +733,7 @@ class DictionaryService extends ChangeNotifier {
       final byId = {for (final w in all) w.id: w};
       final res = <Word>[
         for (final id in ids)
-          if (byId[id] != null) byId[id]!,
+          if (byId[id] != null) _asFavorite(byId[id]!), // важная подмена
       ];
       _log('_readWordsListFromFile("$dictionaryId"): resolved words -> ${res.length}');
       return res;
@@ -740,7 +766,9 @@ class DictionaryService extends ChangeNotifier {
         final favoriteWords = <Word>[];
         for (final id in ids) {
           final w = byId[id];
-          if (w != null) favoriteWords.add(w);
+          if (w != null) {
+            favoriteWords.add(_asFavorite(w)); // важная подмена dictionaryId
+          }
         }
 
         _wordsCache[favoritesFile] = favoriteWords;
