@@ -54,19 +54,21 @@ class _DictionarySelectionViewState
       fontWeight: FontWeight.w600,
     );
 
+    final scheme = Theme.of(context).colorScheme;
+
     return SafeArea(
       top: false,
       child: Material(
         color: Colors.transparent,
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: scheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Шапка: заголовок по центру (меньше), Done — справа
+              // Шапка: заголовок по центру (меньше), справа — пустой блок вместо Done
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
                 child: Row(
@@ -80,10 +82,7 @@ class _DictionarySelectionViewState
                         ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      child: Text(l10n.button_done),
-                    ),
+                    const SizedBox(width: 64),
                   ],
                 ),
               ),
@@ -101,7 +100,8 @@ class _DictionarySelectionViewState
               if (available.isNotEmpty)
                 Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                     child: Wrap(
                       spacing: 10,
                       runSpacing: 0,
@@ -109,7 +109,8 @@ class _DictionarySelectionViewState
                         for (final d in available)
                           ChoiceChip(
                             label: Text(locName(d)),
-                            selected: service.selectedDictionaries.contains(d.file),
+                            selected:
+                            service.selectedDictionaries.contains(d.file),
                             onSelected: (_) {
                               service.toggleDictionarySelection(d.file);
                             },
@@ -123,7 +124,8 @@ class _DictionarySelectionViewState
 
               // Кнопка "Words list"
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
@@ -147,6 +149,28 @@ class _DictionarySelectionViewState
                       }
                           : null,
                       child: Text(l10n.button_show_words),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Кнопка Done — та же форма/высота, но белая заливка
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: scheme.primary,
+                        // необязательно, но чуть лучше контраст:
+                        side: BorderSide(color: scheme.outline.withOpacity(0.4)),
+                      ),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      child: Text(l10n.button_done),
                     ),
                   ),
                 ),
