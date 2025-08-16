@@ -472,7 +472,8 @@ class DictionaryService extends ChangeNotifier {
             .whereType<File>()
             .where((f) {
           final name = f.uri.pathSegments.last.toLowerCase();
-          final isDataFile = name.endsWith('.json') || name.endsWith('.txt');
+          final isDataFile =
+              name.endsWith('.json') || name.endsWith('.txt');
           final isService = name == 'index.json' ||
               name == 'selected.json' ||
               name == 'index.txt' ||
@@ -493,7 +494,8 @@ class DictionaryService extends ChangeNotifier {
     }
 
     availableDictionaries = list;
-    _injectFavoritesIfMissing(); // гарантируем наличие избранного
+    _injectFavoritesIfMissing() // гарантируем наличие избранного
+        ;
     _availableLoaded = true;
     notifyListeners();
   }
@@ -595,7 +597,8 @@ class DictionaryService extends ChangeNotifier {
     if (decoded is List) {
       return decoded
           .where((e) => e is Map)
-          .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
+          .map((e) =>
+          Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
           .toList();
     }
 
@@ -604,21 +607,40 @@ class DictionaryService extends ChangeNotifier {
       final list = decoded['words'] as List;
       return list
           .where((e) => e is Map)
-          .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
+          .map((e) =>
+          Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
           .toList();
     }
 
-    // 3) особый случай: избранное по "ids"
-    if (dictionaryId == favoritesFile && decoded is Map && decoded['ids'] is List) {
+    // 3) особый случай: избранное по "ids" — КЛОНИРУЕМ В СЛОВАРЬ ИЗБРАННОГО
+    if (dictionaryId == favoritesFile &&
+        decoded is Map &&
+        decoded['ids'] is List) {
       final ids = (decoded['ids'] as List).whereType<String>().toList();
       // убеждаемся, что весь пул слов загружен — будем матчить по Word.id
       await _ensureAllCachedLoaded();
       final all = _allCachedWords();
       final byId = {for (final w in all) w.id: w};
-      return [
-        for (final id in ids)
-          if (byId[id] != null) byId[id]!,
-      ];
+
+      final favoriteWords = <Word>[];
+      for (final id in ids) {
+        final w = byId[id];
+        if (w != null) {
+          favoriteWords.add(
+            Word(
+              id: w.id, // сохраняем исходный id
+              dictionaryId: favoritesFile, // группируем как один словарь
+              el: w.el,
+              ru: w.ru,
+              en: w.en,
+              transcription: w.transcription,
+              gender: w.gender,
+              examples: w.examples,
+            ),
+          );
+        }
+      }
+      return favoriteWords;
     }
 
     return const <Word>[];
@@ -649,8 +671,20 @@ class DictionaryService extends ChangeNotifier {
 
         final favoriteWords = <Word>[];
         for (final id in ids) {
-          if (byId[id] != null) {
-            favoriteWords.add(byId[id]!);
+          final w = byId[id];
+          if (w != null) {
+            favoriteWords.add(
+              Word(
+                id: w.id, // исходный id сохраняем
+                dictionaryId: favoritesFile, // все в одну группу
+                el: w.el,
+                ru: w.ru,
+                en: w.en,
+                transcription: w.transcription,
+                gender: w.gender,
+                examples: w.examples,
+              ),
+            );
           }
         }
 
@@ -661,7 +695,8 @@ class DictionaryService extends ChangeNotifier {
         final list = decoded['words'] as List;
         final words = list
             .where((e) => e is Map)
-            .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), favoritesFile))
+            .map((e) =>
+            Word.fromJson(Map<String, dynamic>.from(e as Map), favoritesFile))
             .toList();
         _wordsCache[favoritesFile] = words;
       }
