@@ -19,6 +19,9 @@ class _DictionarySelectionViewState
     extends ConsumerState<DictionarySelectionView> {
   bool _ensured = false;
 
+  // id «виртуального» словаря для избранного
+  static const String _favoritesDictId = 'user_favs.json';
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +48,11 @@ class _DictionarySelectionViewState
           (a, b) => locName(a).toLowerCase().compareTo(locName(b).toLowerCase()),
     );
 
+    // отделим избранное от остальных, чтобы не рисовать дважды
+    final availableWithoutFav = available
+        .where((d) => d.file != _favoritesDictId)
+        .toList(growable: false);
+
     final hasSelection = service.selectedDictionaries.isNotEmpty;
 
     // Заголовок — компактнее
@@ -55,6 +63,9 @@ class _DictionarySelectionViewState
     );
 
     final scheme = Theme.of(context).colorScheme;
+
+    final bool favoritesSelected =
+    service.selectedDictionaries.contains(_favoritesDictId);
 
     return SafeArea(
       top: false,
@@ -96,22 +107,23 @@ class _DictionarySelectionViewState
                   child: Center(child: CircularProgressIndicator()),
                 ),
 
-              // === Чип "Избранное" — всегда сверху, уникальный дизайн ===
+              // === Чип "Избранное" — всегда сверху, уникальный дизайн, но теперь УПРАВЛЯЕТ выбором user_favs.json ===
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: _FavoritesChip(
+                  child: _FavoritesChoiceChip(
                     text: l10n.favorites_chips_text,
-                    onTap: () {
-                      // Пока функционал не реализован — оставим пусто/визуальный отклик
+                    selected: favoritesSelected,
+                    onToggled: () {
+                      service.toggleDictionarySelection(_favoritesDictId);
                     },
                   ),
                 ),
               ),
 
               // Облако чипов (прижато к краям, компактные, выбранные — ярко залиты)
-              if (available.isNotEmpty)
+              if (availableWithoutFav.isNotEmpty)
                 Flexible(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
@@ -124,7 +136,7 @@ class _DictionarySelectionViewState
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final d in available)
+                          for (final d in availableWithoutFav)
                             _DictionaryChip(
                               label: locName(d),
                               selected:
@@ -142,7 +154,8 @@ class _DictionarySelectionViewState
 
               // Кнопка "Words list"
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
@@ -152,7 +165,8 @@ class _DictionarySelectionViewState
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: scheme.primary,
-                        side: BorderSide(color: scheme.outline.withOpacity(0.4)),
+                        side:
+                        BorderSide(color: scheme.outline.withOpacity(0.4)),
                       ),
                       onPressed: hasSelection
                           ? () async {
@@ -222,7 +236,6 @@ class _DictionaryChip extends StatelessWidget {
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          // инвертируем цвет текста под яркую заливку
           color: selected ? scheme.onPrimary : scheme.onSurface,
         ),
       ),
@@ -233,16 +246,14 @@ class _DictionaryChip extends StatelessWidget {
       labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: EdgeInsets.zero,
 
-      // ВАЖНО: делаем выбранный — реально ярким
       selectedColor: scheme.primary,
       backgroundColor: scheme.surfaceVariant.withOpacity(0.45),
 
-      // тонкая обводка у невыбранных; без обводки у выбранных
       side: BorderSide(
         color: selected ? Colors.transparent : scheme.outline.withOpacity(0.5),
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10), // радиус у всех чипсов
+        borderRadius: BorderRadius.circular(10),
       ),
 
       selected: selected,
@@ -251,46 +262,61 @@ class _DictionaryChip extends StatelessWidget {
   }
 }
 
-/// Специальная «Избранное» чипсина со ⭐ и уникальной заливкой.
-/// Сейчас — только визуальная, без функционала.
-class _FavoritesChip extends StatelessWidget {
-  const _FavoritesChip({
+/// Спец-чип «Избранное»: та же логика choice, но другой визуал (⭐ + secondary-палитра).
+class _FavoritesChoiceChip extends StatelessWidget {
+  const _FavoritesChoiceChip({
     required this.text,
-    this.onTap,
+    required this.selected,
+    required this.onToggled,
   });
 
   final String text;
-  final VoidCallback? onTap;
+  final bool selected;
+  final VoidCallback onToggled;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return RawChip(
+    // выберем палитру: яркая заливка secondary/secondaryContainer
+    final Color bg =
+    selected ? scheme.secondary : scheme.secondaryContainer;
+    final Color fg =
+    selected ? scheme.onSecondary : scheme.onSecondaryContainer;
+
+    return ChoiceChip(
       avatar: Icon(
         Icons.star_rounded,
         size: 18,
-        color: scheme.onSecondaryContainer,
+        color: fg,
       ),
       label: Text(
         text,
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          color: scheme.onSecondaryContainer,
+          color: fg,
         ),
       ),
-      // Внешний вид — выделяем среди остальных
+      showCheckmark: false,
+      selected: selected,
+
+      selectedColor: bg,
       backgroundColor: scheme.secondaryContainer,
-      selectedColor: scheme.secondaryContainer,
-      side: BorderSide(color: scheme.secondary.withOpacity(0.25)),
+
+      side: BorderSide(
+        color: selected ? Colors.transparent : scheme.secondary.withOpacity(0.25),
+      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
+
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
       labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      onPressed: onTap, // пока без действия — просто риппл
+      padding: EdgeInsets.zero,
+
+      onSelected: (_) => onToggled(),
     );
   }
 }

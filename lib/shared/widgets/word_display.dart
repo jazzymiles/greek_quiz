@@ -6,6 +6,9 @@ import 'package:greek_quiz/features/settings/app_settings.dart';
 import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/shared/services/tts_service.dart';
 
+// ⬇️ добавили импорт звёздочки
+import 'package:greek_quiz/shared/widgets/favorite_star.dart';
+
 class WordDisplay extends ConsumerStatefulWidget {
   final Word word;
   final bool autoplayEnabled;
@@ -104,17 +107,24 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Вопрос (основное слово) + TTS
+        // Вопрос (основное слово) + Favorite + TTS
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Flexible(
-              child: Text(
-                question,
-                style: textTheme.displaySmall,
-                textAlign: TextAlign.center,
+            // ⬅️ звёздочка слева
+            FavoriteStar(word: widget.word),
+
+            // центрируем слово независимо от иконок по краям
+            Expanded(
+              child: Center(
+                child: Text(
+                  question,
+                  style: textTheme.displaySmall,
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
+
+            // 🔊 TTS справа
             IconButton(
               icon: Icon(Icons.volume_up, color: Theme.of(context).colorScheme.primary),
               onPressed: () async {
@@ -122,7 +132,7 @@ class _WordDisplayState extends ConsumerState<WordDisplay> {
                 await tts.stop();
                 await tts.speak(question, settings.studiedLanguage);
               },
-            )
+            ),
           ],
         ),
 
