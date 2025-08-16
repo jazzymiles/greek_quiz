@@ -33,12 +33,45 @@ class Word {
     // id: либо из данных, либо составной (чтобы избежать конфликтов)
     final id = (json['id']?.toString() ?? '${dictionaryId}|$el');
 
-    // примеры: ожидаем словарь строк по языкам (если нет — null)
+    // ---- ПРИМЕРЫ: поддержка двух вариантов источника ----
     Map<String, String>? examples;
-    if (json['examples'] is Map) {
-      final raw = json['examples'] as Map;
-      examples = raw.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+
+    // 1) Старый формат: example: { el: "...", ru: "...", en: "..." }
+    if (json['example'] is Map) {
+      final raw = (json['example'] as Map);
+      final map = <String, String>{};
+      void putIfNonEmpty(String key, dynamic value) {
+        final s = value?.toString().trim() ?? '';
+        if (s.isNotEmpty) map[key] = s;
+      }
+
+      putIfNonEmpty('el', raw['el']);
+      putIfNonEmpty('ru', raw['ru']);
+      putIfNonEmpty('en', raw['en']);
+
+      if (map.isNotEmpty) {
+        examples = map;
+      }
     }
+
+    // 2) Новый формат: el_example / ru_example / en_example
+    //    Берём их ТОЛЬКО если examples ещё не установлен из 1)
+    if (examples == null) {
+      final map = <String, String>{};
+
+      final elEx = (json['el_example']?.toString().trim() ?? '');
+      final ruEx = (json['ru_example']?.toString().trim() ?? '');
+      final enEx = (json['en_example']?.toString().trim() ?? '');
+
+      if (elEx.isNotEmpty) map['el'] = elEx;
+      if (ruEx.isNotEmpty) map['ru'] = ruEx;
+      if (enEx.isNotEmpty) map['en'] = enEx;
+
+      if (map.isNotEmpty) {
+        examples = map;
+      }
+    }
+    // ------------------------------------------------------
 
     return Word(
       id: id,
@@ -53,6 +86,9 @@ class Word {
   }
 
   String? getUsageExampleForLanguage(String langCode) {
-    return examples?[langCode];
+    final v = examples?[langCode];
+    if (v == null) return null;
+    final s = v.trim();
+    return s.isEmpty ? null : s;
   }
 }

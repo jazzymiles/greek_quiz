@@ -208,10 +208,10 @@ class QuizView extends ConsumerWidget {
 
     if (state.showFeedback) {
       if (option == correctAnswer) {
-        buttonColor = Colors.green.withOpacity(0.3);
+        buttonColor = Colors.green.withOpacity(0.8);
       } else if (isSelected) {
         buttonColor =
-            Theme.of(context).colorScheme.error.withOpacity(0.3);
+            Theme.of(context).colorScheme.error.withOpacity(0.8);
       }
     } else if (isSelected) {
       border = BorderSide(

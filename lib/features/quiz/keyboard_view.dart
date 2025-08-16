@@ -80,6 +80,12 @@ class _KeyboardViewState extends ConsumerState<KeyboardView> {
 
     final correctAnswer = _getWordField(currentWord, settings.answerLanguage);
 
+    // Примеры — как в QuizView
+    final studyExample =
+    currentWord.getUsageExampleForLanguage(settings.studiedLanguage);
+    final answerExample =
+    currentWord.getUsageExampleForLanguage(settings.answerLanguage);
+
     final isChecked = state.status == KeyboardQuizStatus.checked;
     final buttonText = isChecked ? l10n.next_button : l10n.check_button;
     final isButtonEnabled = notifier.textController.text.trim().isNotEmpty;
@@ -120,29 +126,41 @@ class _KeyboardViewState extends ConsumerState<KeyboardView> {
             word: currentWord,
             autoplayEnabled: settings.autoPlaySound,
           ),
-          // Блок фидбэка фиксированной высоты — визуально как в квизе
+
+          // Блок фидбэка + примеры — фиксированной высоты (как в квизе)
           Container(
             height: 120,
             alignment: Alignment.center,
-            child: (state.status == KeyboardQuizStatus.checked)
-                ? Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Text(
-                state.isCorrect
-                    ? l10n.correct_answer_feedback
-                    : correctAnswer,
-                style: TextStyle(
-                  color: state.isCorrect
-                      ? Colors.green
-                      : Theme.of(context).colorScheme.error,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            )
-                : const SizedBox.shrink(),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isChecked)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      state.isCorrect ? l10n.correct_answer_feedback : correctAnswer,
+                      style: TextStyle(
+                        color: state.isCorrect
+                            ? Colors.green
+                            : Theme.of(context).colorScheme.error,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+
+                // Примеры, только когда ответ проверён
+                if (isChecked && studyExample != null && studyExample.isNotEmpty)
+                  _buildUsageExample(
+                    context: context,
+                    studyExample: studyExample,
+                    answerExample: answerExample,
+                  ),
+              ],
+            ),
           ),
+
           // Поле ввода с нужной локалью клавиатуры
           Localizations.override(
             context: context,
@@ -151,7 +169,7 @@ class _KeyboardViewState extends ConsumerState<KeyboardView> {
           ),
           const SizedBox(height: 40),
 
-          // Кнопка проверки — так же, как в QuizView (по центру, фиксированная ширина)
+          // Кнопка проверки — как в QuizView (по центру, фиксированная ширина)
           Center(
             child: SizedBox(
               width: 250,
@@ -162,6 +180,46 @@ class _KeyboardViewState extends ConsumerState<KeyboardView> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUsageExample({
+    required BuildContext context,
+    required String studyExample,
+    String? answerExample,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4.0),
+      child: Column(
+        children: [
+          Text(
+            studyExample,
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey.shade700),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis, // чтобы влезло в 120px блока
+          ),
+          if (answerExample != null &&
+              answerExample.isNotEmpty &&
+              answerExample != studyExample)
+            Padding(
+              padding: const EdgeInsets.only(top: 2.0),
+              child: Text(
+                answerExample,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
         ],
       ),
     );
