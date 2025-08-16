@@ -419,5 +419,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showTranscriptionToggle => 'Show transcription';
 
   @override
+  String get favorites_chips_text => 'Favorites';
+
+  @override
   String get yourTranslationPlaceholder => 'Your translation';
 }

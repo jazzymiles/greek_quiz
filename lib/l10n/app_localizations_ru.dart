@@ -419,5 +419,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get showTranscriptionToggle => 'Показывать транскрипцию';
 
   @override
+  String get favorites_chips_text => 'Избранное';
+
+  @override
   String get yourTranslationPlaceholder => 'Ваш перевод';
 }

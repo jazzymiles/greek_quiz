@@ -176,5 +176,6 @@
     "titleSelectDictionaries": "Select dictionaries",
     "titleWordsList": "Words",
     "updateErrorMessage": "Update error: {error}.",
+    "favorites_chips_text":"Favorites",
     "yourTranslationPlaceholder": "Your translation"
 }

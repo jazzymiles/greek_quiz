@@ -96,6 +96,20 @@ class _DictionarySelectionViewState
                   child: Center(child: CircularProgressIndicator()),
                 ),
 
+              // === Чип "Избранное" — всегда сверху, уникальный дизайн ===
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _FavoritesChip(
+                    text: l10n.favorites_chips_text,
+                    onTap: () {
+                      // Пока функционал не реализован — оставим пусто/визуальный отклик
+                    },
+                  ),
+                ),
+              ),
+
               // Облако чипов (прижато к краям, компактные, выбранные — ярко залиты)
               if (available.isNotEmpty)
                 Flexible(
@@ -113,8 +127,10 @@ class _DictionarySelectionViewState
                           for (final d in available)
                             _DictionaryChip(
                               label: locName(d),
-                              selected: service.selectedDictionaries.contains(d.file),
-                              onTap: () => service.toggleDictionarySelection(d.file),
+                              selected:
+                              service.selectedDictionaries.contains(d.file),
+                              onTap: () =>
+                                  service.toggleDictionarySelection(d.file),
                             ),
                         ],
                       ),
@@ -231,6 +247,50 @@ class _DictionaryChip extends StatelessWidget {
 
       selected: selected,
       onSelected: (_) => onTap(),
+    );
+  }
+}
+
+/// Специальная «Избранное» чипсина со ⭐ и уникальной заливкой.
+/// Сейчас — только визуальная, без функционала.
+class _FavoritesChip extends StatelessWidget {
+  const _FavoritesChip({
+    required this.text,
+    this.onTap,
+  });
+
+  final String text;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return RawChip(
+      avatar: Icon(
+        Icons.star_rounded,
+        size: 18,
+        color: scheme.onSecondaryContainer,
+      ),
+      label: Text(
+        text,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: scheme.onSecondaryContainer,
+        ),
+      ),
+      // Внешний вид — выделяем среди остальных
+      backgroundColor: scheme.secondaryContainer,
+      selectedColor: scheme.secondaryContainer,
+      side: BorderSide(color: scheme.secondary.withOpacity(0.25)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      onPressed: onTap, // пока без действия — просто риппл
     );
   }
 }

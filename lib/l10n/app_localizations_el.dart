@@ -419,5 +419,8 @@ class AppLocalizationsEl extends AppLocalizations {
   String get showTranscriptionToggle => 'Εμφάνιση μεταγραφής';
 
   @override
+  String get favorites_chips_text => 'Εκλεγμένος';
+
+  @override
   String get yourTranslationPlaceholder => 'Η μετάφρασή σας';
 }

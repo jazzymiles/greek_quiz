@@ -176,5 +176,6 @@
     "titleSelectDictionaries": "Επιλογή λεξικών",
     "titleWordsList": "Λέξεις",
     "updateErrorMessage": "Σφάλμα ενημέρωσης: {error}.",
+    "favorites_chips_text":"Εκλεγμένος",
     "yourTranslationPlaceholder": "Η μετάφρασή σας"
 }

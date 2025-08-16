@@ -176,5 +176,6 @@
     "titleSelectDictionaries": "Выбор словарей",
     "titleWordsList": "Слова",
     "updateErrorMessage": "Ошибка обновления: {error}.",
+    "favorites_chips_text":"Избранное",
     "yourTranslationPlaceholder": "Ваш перевод"
 }

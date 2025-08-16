@@ -890,6 +890,12 @@ abstract class AppLocalizations {
   /// **'Show transcription'**
   String get showTranscriptionToggle;
 
+  /// No description provided for @favorites_chips_text.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get favorites_chips_text;
+
   /// No description provided for @yourTranslationPlaceholder.
   ///
   /// In en, this message translates to:
