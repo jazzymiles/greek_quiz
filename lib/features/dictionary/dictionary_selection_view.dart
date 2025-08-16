@@ -68,7 +68,7 @@ class _DictionarySelectionViewState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Шапка: заголовок по центру (меньше), справа — пустой блок вместо Done
+              // Шапка
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
                 child: Row(
@@ -89,33 +89,35 @@ class _DictionarySelectionViewState
 
               const SizedBox(height: 4),
 
-              // Заглушка загрузки списка
+              // Заглушка загрузки
               if (!_ensured && available.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Center(child: CircularProgressIndicator()),
                 ),
 
-              // Облако "чипов" со словарями
+              // Облако чипов (прижато к краям, компактные, выбранные — ярко залиты)
               if (available.isNotEmpty)
                 Flexible(
                   child: SingleChildScrollView(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                    child: Wrap(
-                      spacing: 10,
-                      runSpacing: 0,
-                      children: [
-                        for (final d in available)
-                          ChoiceChip(
-                            label: Text(locName(d)),
-                            selected:
-                            service.selectedDictionaries.contains(d.file),
-                            onSelected: (_) {
-                              service.toggleDictionarySelection(d.file);
-                            },
-                          ),
-                      ],
+                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        alignment: WrapAlignment.start,
+                        runAlignment: WrapAlignment.start,
+                        crossAxisAlignment: WrapCrossAlignment.start,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final d in available)
+                            _DictionaryChip(
+                              label: locName(d),
+                              selected: service.selectedDictionaries.contains(d.file),
+                              onTap: () => service.toggleDictionarySelection(d.file),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -124,14 +126,18 @@ class _DictionarySelectionViewState
 
               // Кнопка "Words list"
               Padding(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: scheme.primary,
+                        side: BorderSide(color: scheme.outline.withOpacity(0.4)),
+                      ),
                       onPressed: hasSelection
                           ? () async {
                         service.filterActiveWords();
@@ -154,7 +160,7 @@ class _DictionarySelectionViewState
                 ),
               ),
 
-              // Кнопка Done — та же форма/высота, но белая заливка
+              // Кнопка Done — белая
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: SafeArea(
@@ -163,12 +169,6 @@ class _DictionarySelectionViewState
                     width: double.infinity,
                     height: 52,
                     child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: scheme.primary,
-                        // необязательно, но чуть лучше контраст:
-                        side: BorderSide(color: scheme.outline.withOpacity(0.4)),
-                      ),
                       onPressed: () => Navigator.of(context).maybePop(),
                       child: Text(l10n.button_done),
                     ),
@@ -179,6 +179,58 @@ class _DictionarySelectionViewState
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Ярко залитый selected + инверсия текста под тему.
+/// Ничего функционально не меняет.
+class _DictionaryChip extends StatelessWidget {
+  const _DictionaryChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return ChoiceChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          // инвертируем цвет текста под яркую заливку
+          color: selected ? scheme.onPrimary : scheme.onSurface,
+        ),
+      ),
+      showCheckmark: false,
+
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.zero,
+
+      // ВАЖНО: делаем выбранный — реально ярким
+      selectedColor: scheme.primary,
+      backgroundColor: scheme.surfaceVariant.withOpacity(0.45),
+
+      // тонкая обводка у невыбранных; без обводки у выбранных
+      side: BorderSide(
+        color: selected ? Colors.transparent : scheme.outline.withOpacity(0.5),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10), // радиус у всех чипсов
+      ),
+
+      selected: selected,
+      onSelected: (_) => onTap(),
     );
   }
 }
