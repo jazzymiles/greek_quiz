@@ -11,18 +11,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:greek_quiz/data/models/dictionary_info.dart';
 import 'package:greek_quiz/data/models/word.dart';
 
-/// Имя файла словаря избранного
-const String kFavoritesFileJson = 'user_favs.json';
-const String kFavoritesFileTxt  = 'user_favs.txt';
-
-bool _isFavoritesFileName(String name) {
-  final n = name.toLowerCase();
-  return n == kFavoritesFileJson || n == kFavoritesFileTxt;
-}
-
 /// Service that manages dictionary metadata, selection and active words.
 class DictionaryService extends ChangeNotifier {
   DictionaryService();
+
+  // === Favorites dictionary (virtual) ===
+  static const String favoritesFile = 'user_favs.json';
+  static const String favoritesNameRu = 'Избранное';
+  static const String favoritesNameEn = 'Favorites';
+  static const String favoritesNameEl = 'Αγαπημένα';
 
   // Public state
   List<Word> activeWords = [];
@@ -49,8 +46,9 @@ class DictionaryService extends ChangeNotifier {
   /// Базовая инициализация без автозагрузки.
   Future<void> initialize() async {
     await _ensureDirs();
-    await _ensureUserFavsExists();        // <-- создаём пустой словарь избранного при первом запуске
+    await _ensureFavoritesFileExists(); // <- создать избранное, если нет
     await ensureAvailableLoaded();
+    _injectFavoritesIfMissing();        // <- убедиться, что избранное есть в списке
     await _loadSelected();
     // Загрузим слова для выбранных словарей (чтобы активные сразу работали)
     await _ensureWordsLoadedForSelection();
@@ -84,6 +82,7 @@ class DictionaryService extends ChangeNotifier {
         // молча: пользователь сможет скачать вручную из настроек
       } finally {
         await ensureAvailableLoaded();
+        _injectFavoritesIfMissing();
         await _ensureWordsLoadedForSelection();
         await _ensureAllCachedLoaded();
         _rebuildActiveWords();
@@ -111,7 +110,7 @@ class DictionaryService extends ChangeNotifier {
       selectedDictionaries.add(fileId);
     }
     _saveSelected(); // fire-and-forget
-    _ensureWordsLoadedForSelection(); // preload words (избранные)
+    _ensureWordsLoadedForSelection(); // preload words (включая избранное)
     _rebuildActiveWords();
     notifyListeners();
   }
@@ -228,6 +227,7 @@ class DictionaryService extends ChangeNotifier {
 
       // Обновляем внутреннее состояние
       await _fetchAvailableDictionaries();
+      _injectFavoritesIfMissing();
       await _ensureAllCachedLoaded();
       await _ensureWordsLoadedForSelection();
       _rebuildActiveWords();
@@ -278,8 +278,10 @@ class DictionaryService extends ChangeNotifier {
       if (line.startsWith('#')) continue;
 
       // поддержим запятая/точка с запятой/таб
-      final parts =
-      line.split(RegExp(r'\s*,\s*|\s*;\s*|\t')).where((p) => p.isNotEmpty).toList();
+      final parts = line
+          .split(RegExp(r'\s*,\s*|\s*;\s*|\t'))
+          .where((p) => p.isNotEmpty)
+          .toList();
 
       String? file;
       String? url;
@@ -329,11 +331,14 @@ class DictionaryService extends ChangeNotifier {
 
     // имена
     String nameRu =
-    (m['name_ru'] ?? m['ru'] ?? m['nameRu'] ?? m['title_ru'] ?? file).toString();
+    (m['name_ru'] ?? m['ru'] ?? m['nameRu'] ?? m['title_ru'] ?? file)
+        .toString();
     String nameEn =
-    (m['name_en'] ?? m['en'] ?? m['nameEn'] ?? m['title_en'] ?? file).toString();
+    (m['name_en'] ?? m['en'] ?? m['nameEn'] ?? m['title_en'] ?? file)
+        .toString();
     String nameEl =
-    (m['name_el'] ?? m['el'] ?? m['nameEl'] ?? m['title_el'] ?? file).toString();
+    (m['name_el'] ?? m['el'] ?? m['nameEl'] ?? m['title_el'] ?? file)
+        .toString();
 
     if (file.isEmpty) {
       // если file не задан — вытащим из URL
@@ -377,26 +382,17 @@ class DictionaryService extends ChangeNotifier {
     final dir = await _dictionariesDir();
     for (final id in selectedDictionaries) {
       if (_wordsCache.containsKey(id)) continue;
+
+      if (id == favoritesFile) {
+        // особая загрузка избранного
+        await _loadFavoritesIntoCache();
+        continue;
+      }
+
       final file = File('${dir.path}/$id');
       if (await file.exists()) {
-        final raw = await file.readAsString();
-        final decoded = jsonDecode(raw);
-
-        // Поддержка и списка, и обёртки {"words":[...]}
-        final List list;
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map && decoded['words'] is List) {
-          list = decoded['words'] as List;
-        } else {
-          _wordsCache[id] = const <Word>[];
-          continue;
-        }
-
-        _wordsCache[id] = list
-            .whereType<Map>()
-            .map((e) => Word.fromJson(Map<String, dynamic>.from(e), id))
-            .toList();
+        final list = await _readWordsListFromFile(file, id);
+        _wordsCache[id] = list;
       } else {
         _wordsCache[id] = const <Word>[];
       }
@@ -415,11 +411,10 @@ class DictionaryService extends ChangeNotifier {
       final name = f.uri.pathSegments.last.toLowerCase();
       // .json и .txt; исключаем служебные index/selected
       final isDataFile = name.endsWith('.json') || name.endsWith('.txt');
-      final isService =
-          name == 'index.json' ||
-              name == 'selected.json' ||
-              name == 'index.txt' ||
-              name == 'selected.txt';
+      final isService = name == 'index.json' ||
+          name == 'selected.json' ||
+          name == 'index.txt' ||
+          name == 'selected.txt';
       return isDataFile && !isService;
     })
         .toList();
@@ -428,24 +423,14 @@ class DictionaryService extends ChangeNotifier {
       final id = f.uri.pathSegments.last; // имя файла — наш dictionaryId
       if (_wordsCache.containsKey(id)) continue;
 
+      if (id == favoritesFile) {
+        await _loadFavoritesIntoCache();
+        continue;
+      }
+
       try {
-        final raw = await f.readAsString();
-        final decoded = jsonDecode(raw);
-
-        final List list;
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map && decoded['words'] is List) {
-          list = decoded['words'] as List;
-        } else {
-          _wordsCache[id] = const <Word>[];
-          continue;
-        }
-
-        _wordsCache[id] = list
-            .whereType<Map>()
-            .map((e) => Word.fromJson(Map<String, dynamic>.from(e), id))
-            .toList();
+        final list = await _readWordsListFromFile(f, id);
+        _wordsCache[id] = list;
       } catch (e) {
         _wordsCache[id] = const <Word>[];
       }
@@ -471,20 +456,18 @@ class DictionaryService extends ChangeNotifier {
         list = [];
       }
     } else {
-      // Fallback: просканировать папку на *.json и *.txt (кроме служебных и избранного)
+      // Fallback: просканировать папку на *.json и *.txt (кроме служебных)
       if (await dir.exists()) {
         final entries = dir
             .listSync()
             .whereType<File>()
             .where((f) {
           final name = f.uri.pathSegments.last.toLowerCase();
-          final isDataFile =
-              name.endsWith('.json') || name.endsWith('.txt');
+          final isDataFile = name.endsWith('.json') || name.endsWith('.txt');
           final isService = name == 'index.json' ||
               name == 'selected.json' ||
               name == 'index.txt' ||
-              name == 'selected.txt' ||
-              _isFavoritesFileName(name); // <— скрываем избранное из общего списка
+              name == 'selected.txt';
           return isDataFile && !isService;
         });
         for (final f in entries) {
@@ -501,6 +484,7 @@ class DictionaryService extends ChangeNotifier {
     }
 
     availableDictionaries = list;
+    _injectFavoritesIfMissing(); // гарантируем наличие избранного
     _availableLoaded = true;
     notifyListeners();
   }
@@ -540,36 +524,6 @@ class DictionaryService extends ChangeNotifier {
     return File('${dir.path}/selected.json');
   }
 
-  Future<File> _favoritesFile() async {
-    final dir = await _dictionariesDir();
-    await dir.create(recursive: true);
-    // используем JSON-формат
-    return File('${dir.path}/$kFavoritesFileJson');
-  }
-
-  Future<void> _ensureUserFavsExists() async {
-    try {
-      final f = await _favoritesFile();
-      if (!await f.exists()) {
-        // создаём пустой словарь вида {"words":[]}
-        await f.writeAsString(jsonEncode({'words': <Map<String, dynamic>>[]}));
-      }
-      // предварительно прогрузим его в кэш (пустой список)
-      if (!_wordsCache.containsKey(kFavoritesFileJson)) {
-        _wordsCache[kFavoritesFileJson] = const <Word>[];
-      }
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  /// Позволяет сервису избранного синхронизировать кэш.
-  void updateFavoritesCache(List<Word> words) {
-    _wordsCache[kFavoritesFileJson] = List<Word>.from(words);
-    // Не добавляем избранное в availableDictionaries — оно управляется отдельно.
-    notifyListeners();
-  }
-
   Future<void> _ensureDirs() async {
     final dir = await _dictionariesDir();
     await dir.create(recursive: true);
@@ -591,6 +545,90 @@ class DictionaryService extends ChangeNotifier {
     }
     return true;
   }
+
+  // -------- Favorites helpers --------
+
+  Future<void> _ensureFavoritesFileExists() async {
+    final dir = await _dictionariesDir();
+    final favFile = File('${dir.path}/$favoritesFile');
+    if (await favFile.exists()) return;
+
+    // создаём пустую структуру {"words":[]}, чтобы сервис мог парсить как обычный словарь
+    await favFile.create(recursive: true);
+    await favFile.writeAsString(jsonEncode({'words': <dynamic>[]}));
+  }
+
+  void _injectFavoritesIfMissing() {
+    final has = availableDictionaries.any((d) => d.file == favoritesFile);
+    if (!has) {
+      availableDictionaries = [
+        DictionaryInfo(
+          file: favoritesFile,
+          nameRu: favoritesNameRu,
+          nameEn: favoritesNameEn,
+          nameEl: favoritesNameEl,
+          filePath: favoritesFile, // локальный файл
+        ),
+        ...availableDictionaries,
+      ];
+    }
+  }
+
+  /// Прочитать список слов из файла словаря (поддержка форматов):
+  ///  - JSON-массив: [ {...}, {...} ]
+  ///  - Объект с ключом "words": { "words": [ {...}, ... ] }
+  ///  - Для избранного возможен формат { "ids": [ "dictId|el", ... ] }
+  Future<List<Word>> _readWordsListFromFile(File f, String dictionaryId) async {
+    final raw = await f.readAsString();
+    final decoded = jsonDecode(raw);
+
+    // 1) массив объектов
+    if (decoded is List) {
+      return decoded
+          .where((e) => e is Map)
+          .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
+          .toList();
+    }
+
+    // 2) объект с "words"
+    if (decoded is Map && decoded['words'] is List) {
+      final list = decoded['words'] as List;
+      return list
+          .where((e) => e is Map)
+          .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
+          .toList();
+    }
+
+    // 3) особый случай: избранное по "ids"
+    if (dictionaryId == favoritesFile && decoded is Map && decoded['ids'] is List) {
+      final ids = (decoded['ids'] as List).whereType<String>().toList();
+      // убеждаемся, что весь пул слов загружен — будем матчить по Word.id
+      await _ensureAllCachedLoaded();
+      final all = _allCachedWords();
+      final byId = {for (final w in all) w.id: w};
+      return [
+        for (final id in ids)
+          if (byId[id] != null) byId[id]!,
+      ];
+    }
+
+    return const <Word>[];
+  }
+
+  /// Загрузка favorites в кэш, с поддержкой всех форматов.
+  Future<void> _loadFavoritesIntoCache() async {
+    final dir = await _dictionariesDir();
+    final favFile = File('${dir.path}/$favoritesFile');
+    if (!await favFile.exists()) {
+      await _ensureFavoritesFileExists();
+    }
+    try {
+      final list = await _readWordsListFromFile(favFile, favoritesFile);
+      _wordsCache[favoritesFile] = list;
+    } catch (_) {
+      _wordsCache[favoritesFile] = const <Word>[];
+    }
+  }
 }
 
 // Riverpod providers
@@ -602,149 +640,4 @@ FutureProvider<List<DictionaryInfo>>((ref) async {
   final service = ref.read(dictionaryServiceProvider);
   await service.ensureAvailableLoaded();
   return service.availableDictionaries;
-});
-
-/// ===== Сервис избранного (user_favs) =====
-/// Хранит избранные слова в user_favs.json и синхронизируется с DictionaryService.
-class FavoritesService extends ChangeNotifier {
-  FavoritesService(this.ref);
-
-  final Ref ref;
-
-  final List<Word> _favorites = [];
-  bool _loaded = false;
-
-  List<Word> get favorites => List.unmodifiable(_favorites);
-  bool get isLoaded => _loaded;
-
-  Future<Directory> _dictionariesDir() async {
-    final base = await getApplicationDocumentsDirectory();
-    return Directory('${base.path}/dictionaries');
-  }
-
-  Future<File> _favoritesFile() async {
-    final dir = await _dictionariesDir();
-    await dir.create(recursive: true);
-    return File('${dir.path}/$kFavoritesFileJson');
-    // (если понадобится поддержка .txt — можно расширить)
-  }
-
-  Future<void> initialize() async {
-    await _loadFromDisk();
-  }
-
-  Future<void> _loadFromDisk() async {
-    try {
-      final f = await _favoritesFile();
-      if (!await f.exists()) {
-        await f.writeAsString(jsonEncode({'words': <Map<String, dynamic>>[]}));
-      }
-      final raw = await f.readAsString();
-      final decoded = jsonDecode(raw);
-
-      List list;
-      if (decoded is Map && decoded['words'] is List) {
-        list = decoded['words'] as List;
-      } else if (decoded is List) {
-        list = decoded;
-      } else {
-        list = const [];
-      }
-
-      _favorites
-        ..clear()
-        ..addAll(list.whereType<Map>().map((e) {
-          final m = Map<String, dynamic>.from(e);
-          // при восстановлении помечаем dictionaryId как user_favs.json
-          return Word.fromJson(m, kFavoritesFileJson);
-        }));
-
-      _loaded = true;
-
-      // синхронизируем кэш словарей в DictionaryService
-      ref.read(dictionaryServiceProvider).updateFavoritesCache(_favorites);
-
-      notifyListeners();
-    } catch (_) {
-      _loaded = true;
-      notifyListeners();
-    }
-  }
-
-  bool isFavorite(String wordId) =>
-      _favorites.any((w) => w.id == wordId);
-
-  Future<void> toggle(Word w) async {
-    if (isFavorite(w.id)) {
-      await removeById(w.id);
-    } else {
-      await add(w);
-    }
-  }
-
-  Future<void> add(Word w) async {
-    if (isFavorite(w.id)) return;
-    _favorites.add(_cloneForFavs(w));
-    await _save();
-  }
-
-  Future<void> removeById(String wordId) async {
-    _favorites.removeWhere((w) => w.id == wordId);
-    await _save();
-  }
-
-  Word _cloneForFavs(Word w) {
-    // Копируем слово и помечаем словарь как user_favs.json
-    return Word(
-      id: w.id,
-      dictionaryId: kFavoritesFileJson,
-      el: w.el,
-      ru: w.ru,
-      en: w.en,
-      transcription: w.transcription,
-      gender: w.gender,
-      examples: w.examples,
-    );
-  }
-
-  Map<String, dynamic> _wordToJson(Word w) {
-    final map = <String, dynamic>{
-      'id': w.id,
-      'el': w.el,
-      'ru': w.ru,
-      if (w.en != null) 'en': w.en,
-      'transcription': w.transcription,
-      if (w.gender != null) 'gender': w.gender,
-    };
-    if (w.examples != null && w.examples!.isNotEmpty) {
-      map['example'] = w.examples; // совместимо с твоей моделью
-    }
-    return map;
-  }
-
-  Future<void> _save() async {
-    try {
-      final f = await _favoritesFile();
-      final data = {
-        'words': _favorites.map(_wordToJson).toList(),
-      };
-      await f.writeAsString(jsonEncode(data));
-
-      // синхронизируем кэш у DictionaryService
-      ref.read(dictionaryServiceProvider).updateFavoritesCache(_favorites);
-
-      notifyListeners();
-    } catch (_) {
-      // ignore
-    }
-  }
-}
-
-/// Провайдер избранного
-final favoritesServiceProvider =
-ChangeNotifierProvider<FavoritesService>((ref) {
-  final svc = FavoritesService(ref);
-  // Отложенная инициализация (не блокируем провайдера)
-  svc.initialize();
-  return svc;
 });
