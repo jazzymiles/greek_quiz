@@ -15,6 +15,9 @@ import 'package:greek_quiz/features/settings/settings_provider.dart';
 import 'package:greek_quiz/l10n/app_localizations.dart';
 import 'package:greek_quiz/features/quiz/quiz_mode.dart';
 
+import 'package:greek_quiz/features/favorites/favorites_service.dart';
+
+
 // Базовый URL твоего индекса словарей
 const String kDictionariesIndexUrl = 'https://redinger.cc/greekquiz/settings.txt';
 
@@ -42,6 +45,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final svc = ref.read(dictionaryServiceProvider);
       final settings = ref.read(settingsProvider);
 
+      // Инициализируем сервис избранного до словарей
+      await ref.read(favoritesServiceProvider).initialize();
+
       await svc.initializeWithBootstrap(
         interfaceLanguage: settings.interfaceLanguage,
         indexUrlIfBootstrap: kDictionariesIndexUrl,
@@ -53,7 +59,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(cardModeProvider.notifier).refresh();
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;

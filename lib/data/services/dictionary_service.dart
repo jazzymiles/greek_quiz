@@ -166,6 +166,15 @@ class DictionaryService extends ChangeNotifier {
     return filtered.take(count).toList();
   }
 
+  /// Обновить кэш избранного после изменений в FavoritesService
+  Future<void> refreshFavorites() async {
+    await _loadFavoritesIntoCache();
+    if (selectedDictionaries.contains(favoritesFile)) {
+      _rebuildActiveWords();
+      notifyListeners();
+    }
+  }
+
   // ---- Download dictionaries (remote-only) ----
 
   /// Downloads index and dictionaries it references into app storage.
@@ -553,9 +562,9 @@ class DictionaryService extends ChangeNotifier {
     final favFile = File('${dir.path}/$favoritesFile');
     if (await favFile.exists()) return;
 
-    // создаём пустую структуру {"words":[]}, чтобы сервис мог парсить как обычный словарь
+    // Создаём файл с форматом ids для совместимости с FavoritesService
     await favFile.create(recursive: true);
-    await favFile.writeAsString(jsonEncode({'words': <dynamic>[]}));
+    await favFile.writeAsString(jsonEncode({'ids': <String>[]}));
   }
 
   void _injectFavoritesIfMissing() {
@@ -615,7 +624,7 @@ class DictionaryService extends ChangeNotifier {
     return const <Word>[];
   }
 
-  /// Загрузка favorites в кэш, с поддержкой всех форматов.
+  /// Загрузка favorites в кэш, с поддержкой всех форматов
   Future<void> _loadFavoritesIntoCache() async {
     final dir = await _dictionariesDir();
     final favFile = File('${dir.path}/$favoritesFile');
@@ -623,9 +632,45 @@ class DictionaryService extends ChangeNotifier {
       await _ensureFavoritesFileExists();
     }
     try {
-      final list = await _readWordsListFromFile(favFile, favoritesFile);
-      _wordsCache[favoritesFile] = list;
-    } catch (_) {
+      // Читаем файл и парсим
+      final raw = await favFile.readAsString();
+      final decoded = jsonDecode(raw);
+
+      // Обрабатываем формат с ids
+      if (decoded is Map && decoded['ids'] is List) {
+        final ids = (decoded['ids'] as List).whereType<String>().toList();
+
+        // Убеждаемся, что все словари загружены
+        await _ensureAllCachedLoaded();
+
+        // Собираем слова по ID
+        final all = _allCachedWords();
+        final byId = {for (final w in all) w.id: w};
+
+        final favoriteWords = <Word>[];
+        for (final id in ids) {
+          if (byId[id] != null) {
+            favoriteWords.add(byId[id]!);
+          }
+        }
+
+        _wordsCache[favoritesFile] = favoriteWords;
+      }
+      // Обрабатываем формат с words (старый формат)
+      else if (decoded is Map && decoded['words'] is List) {
+        final list = decoded['words'] as List;
+        final words = list
+            .where((e) => e is Map)
+            .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), favoritesFile))
+            .toList();
+        _wordsCache[favoritesFile] = words;
+      }
+      // Пустой массив слов по умолчанию
+      else {
+        _wordsCache[favoritesFile] = const <Word>[];
+      }
+    } catch (e) {
+      debugPrint('[DictionaryService] Error loading favorites: $e');
       _wordsCache[favoritesFile] = const <Word>[];
     }
   }

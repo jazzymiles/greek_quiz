@@ -8,10 +8,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:greek_quiz/data/models/word.dart';
 
-/// Простой сервис «Избранное»:
-/// - хранит set id слов;
-/// - сохраняет/читает в файл JSON;
-/// - уведомляет слушателей через ChangeNotifier.
+/// Сервис для работы с избранным
+/// Синхронизирован с DictionaryService через общий файл
 class FavoritesService extends ChangeNotifier {
   FavoritesService();
 
@@ -20,7 +18,7 @@ class FavoritesService extends ChangeNotifier {
   bool _loaded = false;
   Future<void>? _loadFuture;
 
-  /// Инициализация (ленивая): читаем файл 1 раз.
+  /// Инициализация - читаем файл один раз
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
     _loadFuture ??= _loadFromDisk();
@@ -31,14 +29,15 @@ class FavoritesService extends ChangeNotifier {
     }
   }
 
+  /// Используем тот же путь, что и DictionaryService для синхронизации
   Future<File> _file() async {
     final dir = await getApplicationDocumentsDirectory();
-    final favDir = Directory('${dir.path}/favorites');
-    if (!await favDir.exists()) {
-      await favDir.create(recursive: true);
+    final dictDir = Directory('${dir.path}/dictionaries');
+    if (!await dictDir.exists()) {
+      await dictDir.create(recursive: true);
     }
-    return File('${favDir.path}/user_favs.json');
-    // формат файла: ["dictId|el", "anotherId|..."]
+    // Используем имя файла из DictionaryService.favoritesFile
+    return File('${dictDir.path}/user_favs.json');
   }
 
   Future<void> _loadFromDisk() async {
@@ -47,17 +46,29 @@ class FavoritesService extends ChangeNotifier {
       if (await f.exists()) {
         final raw = await f.readAsString();
         final decoded = jsonDecode(raw);
+
+        // Поддерживаем два формата:
+        // 1. Простой массив ID: ["id1", "id2"]
+        // 2. Формат с ключом ids: {"ids": ["id1", "id2"]}
         if (decoded is List) {
           _ids
             ..clear()
             ..addAll(decoded.whereType<String>());
+        } else if (decoded is Map && decoded['ids'] is List) {
+          _ids
+            ..clear()
+            ..addAll((decoded['ids'] as List).whereType<String>());
         }
       } else {
-        // создаём пустой файл
-        await f.writeAsString(jsonEncode(<String>[]));
+        // Создаём пустой файл в формате для DictionaryService
+        await f.writeAsString(jsonEncode({'ids': <String>[]}));
       }
     } catch (_) {
-      // игнор: пусть будет пустой набор
+      // При ошибке создаём пустой файл
+      try {
+        final f = await _file();
+        await f.writeAsString(jsonEncode({'ids': <String>[]}));
+      } catch (_) {}
     }
     _loaded = true;
     notifyListeners();
@@ -66,15 +77,21 @@ class FavoritesService extends ChangeNotifier {
   Future<void> _saveToDisk() async {
     try {
       final f = await _file();
-      await f.writeAsString(jsonEncode(_ids.toList()));
+      // Сохраняем в формате, который понимает DictionaryService
+      await f.writeAsString(jsonEncode({'ids': _ids.toList()}));
     } catch (_) {
-      // игнор ошибок записи
+      // игнорируем ошибки записи
     }
   }
 
   // --- Публичное API ---
 
-  /// Добавить слово в избранное.
+  /// Инициализация сервиса - вызывается при старте приложения
+  Future<void> initialize() async {
+    await _ensureLoaded();
+  }
+
+  /// Добавить слово в избранное
   Future<void> add(Word word) async {
     await _ensureLoaded();
     if (_ids.add(word.id)) {
@@ -83,7 +100,7 @@ class FavoritesService extends ChangeNotifier {
     }
   }
 
-  /// Удалить по id.
+  /// Удалить по id
   Future<void> removeById(String wordId) async {
     await _ensureLoaded();
     if (_ids.remove(wordId)) {
@@ -92,7 +109,7 @@ class FavoritesService extends ChangeNotifier {
     }
   }
 
-  /// Переключить состояние избранного.
+  /// Переключить состояние избранного
   Future<void> toggle(Word word) async {
     await _ensureLoaded();
     if (_ids.contains(word.id)) {
@@ -104,19 +121,19 @@ class FavoritesService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Проверить, в избранном ли id.
+  /// Проверить, в избранном ли id
   bool isFavorite(String wordId) {
-    // быстрый путь: если ещё не грузились — вернём false, UI позже обновится
+    // Возвращаем false до загрузки, UI обновится после notifyListeners
     return _ids.contains(wordId);
   }
 
-  /// Текущее количество.
+  /// Текущее количество
   int get count => _ids.length;
 
-  /// Все id (read-only snapshot).
+  /// Все id (read-only snapshot)
   List<String> get allIds => List.unmodifiable(_ids);
 }
 
-// Провайдер сервиса избранного.
+// Провайдер сервиса избранного
 final favoritesServiceProvider =
 ChangeNotifierProvider<FavoritesService>((ref) => FavoritesService());
