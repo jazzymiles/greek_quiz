@@ -17,7 +17,6 @@ import 'package:greek_quiz/features/quiz/quiz_mode.dart';
 
 import 'package:greek_quiz/features/favorites/favorites_service.dart';
 
-
 // Базовый URL твоего индекса словарей
 const String kDictionariesIndexUrl = 'https://redinger.cc/greekquiz/settings.txt';
 
@@ -48,6 +47,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // Инициализируем сервис избранного до словарей
       await ref.read(favoritesServiceProvider).initialize();
 
+      // initializeWithBootstrap сам решит, нужно ли качать (первый запуск/нет файлов)
       await svc.initializeWithBootstrap(
         interfaceLanguage: settings.interfaceLanguage,
         indexUrlIfBootstrap: kDictionariesIndexUrl,
@@ -59,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(cardModeProvider.notifier).refresh();
     });
   }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -67,7 +68,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // Нужно ли показать "первичную заглушку": словарей ещё нет и загрузка не идёт
     final bool needsFirstDownloadCta =
-        !dictionaryService.isDownloading && dictionaryService.availableDictionaries.isEmpty;
+        !dictionaryService.isDownloading &&
+            dictionaryService.availableDictionaries.isEmpty;
 
     return Stack(
       children: [
@@ -216,8 +218,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          // Короткое объяснение без новых ключей (нейтрально)
-                          // Можно заменить на свой текст в ARB позже.
                           'No dictionaries available. Check your internet connection and try again.',
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -230,7 +230,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           children: [
                             FilledButton.icon(
                               icon: const Icon(Icons.download),
-                              // Не создаём новый ключ. Можно позже заменить на локализованный.
                               label: const Text('Download dictionaries'),
                               onPressed: () async {
                                 final svc = ref.read(dictionaryServiceProvider);

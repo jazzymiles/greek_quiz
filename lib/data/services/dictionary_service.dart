@@ -41,20 +41,30 @@ class DictionaryService extends ChangeNotifier {
   bool _availableLoaded = false;
   Future<void>? _availableLoadFuture;
 
+  void _log(String msg) => debugPrint('[DictionaryService] $msg');
+
   // ---- Public API ----
 
   /// Базовая инициализация без автозагрузки.
   Future<void> initialize() async {
+    _log('initialize(): start');
     await _ensureDirs();
-    await _ensureFavoritesFileExists(); // <- создать избранное, если нет
+    await _ensureFavoritesFileExists();
     await ensureAvailableLoaded();
-    _injectFavoritesIfMissing();        // <- убедиться, что избранное есть в списке
+    _injectFavoritesIfMissing();
     await _loadSelected();
-    // Загрузим слова для выбранных словарей (чтобы активные сразу работали)
+
+    // подгрузим слова из выбранных словарей
     await _ensureWordsLoadedForSelection();
-    // И — для режима "All words" — прогрузим в кэш все словари из папки
+
+    // прогрузим в кэш все словари из папки (кроме избранного)
     await _ensureAllCachedLoaded();
+
+    // пересоберём избранное (после появления словарей ids смогут резолвиться)
+    await _loadFavoritesIntoCache();
+
     _rebuildActiveWords();
+    _log('initialize(): done; available=${availableDictionaries.length}, selected=${selectedDictionaries.length}, activeWords=${activeWords.length}');
     notifyListeners();
   }
 
@@ -63,51 +73,77 @@ class DictionaryService extends ChangeNotifier {
     String interfaceLanguage = 'en',
     String? indexUrlIfBootstrap,
   }) async {
+    _log('initializeWithBootstrap(): start; lang=$interfaceLanguage, indexUrlIfBootstrap=${indexUrlIfBootstrap ?? "(null)"}');
     await initialize();
 
     if (indexUrlIfBootstrap == null || indexUrlIfBootstrap.isEmpty) {
-      return; // нет URL — ничего не делаем
+      _log('initializeWithBootstrap(): no indexUrl provided -> return');
+      return;
     }
 
-    final needBootstrap = availableDictionaries.isEmpty ||
-        !(await _allIndexedFilesPresent(availableDictionaries));
+    // игнорируем виртуальный словарь избранного
+    final realDictionaries = availableDictionaries
+        .where((d) => d.file != favoritesFile)
+        .toList(growable: false);
+
+    _log('initializeWithBootstrap(): realDictionaries=${realDictionaries.length} -> [${realDictionaries.map((e)=>e.file).join(', ')}]');
+
+    final needBootstrap =
+        realDictionaries.isEmpty ||
+            !(await _allIndexedFilesPresent(realDictionaries));
+
+    _log('initializeWithBootstrap(): needBootstrap=$needBootstrap');
 
     if (needBootstrap) {
       try {
+        _log('initializeWithBootstrap(): calling downloadAndSaveDictionaries()');
         await downloadAndSaveDictionaries(
           interfaceLanguage,
           indexUrl: indexUrlIfBootstrap,
         );
-      } catch (_) {
-        // молча: пользователь сможет скачать вручную из настроек
+      } catch (e) {
+        _log('initializeWithBootstrap(): download failed: $e');
       } finally {
+        _log('initializeWithBootstrap(): finalizing state after bootstrap');
         await ensureAvailableLoaded();
         _injectFavoritesIfMissing();
-        await _ensureWordsLoadedForSelection();
         await _ensureAllCachedLoaded();
+        await _loadFavoritesIntoCache();
+        await _ensureWordsLoadedForSelection();
         _rebuildActiveWords();
+        _log('initializeWithBootstrap(): done; available=${availableDictionaries.length}, activeWords=${activeWords.length}');
         notifyListeners();
       }
+    } else {
+      _log('initializeWithBootstrap(): bootstrap not needed');
     }
   }
 
   /// Ensure list of available dictionaries is loaded exactly once.
   Future<void> ensureAvailableLoaded() async {
-    if (_availableLoaded && availableDictionaries.isNotEmpty) return;
+    if (_availableLoaded && availableDictionaries.isNotEmpty) {
+      _log('ensureAvailableLoaded(): already loaded; available=${availableDictionaries.length}');
+      return;
+    }
+    _log('ensureAvailableLoaded(): loading...');
     _availableLoadFuture ??= _fetchAvailableDictionaries();
     try {
       await _availableLoadFuture;
     } finally {
       _availableLoadFuture = null;
+      _log('ensureAvailableLoaded(): loaded; available=${availableDictionaries.length}');
     }
   }
 
   /// Toggle selection of a dictionary by its id (file).
   void toggleDictionarySelection(String fileId) {
+    final before = selectedDictionaries.length;
     if (selectedDictionaries.contains(fileId)) {
       selectedDictionaries.remove(fileId);
+      _log('toggleDictionarySelection("$fileId"): removed (before=$before -> after=${selectedDictionaries.length})');
     } else {
       selectedDictionaries.add(fileId);
+      _log('toggleDictionarySelection("$fileId"): added (before=$before -> after=${selectedDictionaries.length})');
     }
     _saveSelected(); // fire-and-forget
     _ensureWordsLoadedForSelection(); // preload words (включая избранное)
@@ -116,10 +152,12 @@ class DictionaryService extends ChangeNotifier {
   }
 
   /// Re-compute activeWords from selected dictionaries.
+  /// Важно: без notifyListeners() — иначе Riverpod может упасть при вызове в инициализации других провайдеров.
   void filterActiveWords() {
-    _ensureWordsLoadedForSelection();
+    _log('filterActiveWords(): recompute from selected=${selectedDictionaries.length}');
+    _ensureWordsLoadedForSelection(); // без await — как и раньше
     _rebuildActiveWords();
-    notifyListeners();
+    // нет notifyListeners() умышленно
   }
 
   /// Return a random word from active set (or null if empty).
@@ -137,10 +175,6 @@ class DictionaryService extends ChangeNotifier {
   }
 
   /// Picks candidates for wrong options.
-  ///
-  /// Если [useAllWords] = true — берём из *всех загруженных словарей*.
-  /// Если false — **строго** из выбранных (activeWords), без автоподмешивания.
-  /// Порядок — случайный; возвращаем до [count] элементов.
   List<Word> getQuizOptions({
     required Word excludeWord,
     bool useAllWords = false,
@@ -151,11 +185,12 @@ class DictionaryService extends ChangeNotifier {
     if (useAllWords) {
       final allCached = _allCachedWords();
       pool = allCached.isNotEmpty ? List<Word>.from(allCached) : List<Word>.from(activeWords);
+      _log('getQuizOptions(): useAllWords=true; pool=${pool.length}');
     } else {
       pool = List<Word>.from(activeWords);
+      _log('getQuizOptions(): useAllWords=false; pool=${pool.length}');
     }
 
-    // Удалим сам правильный ответ из пула и уберём дубликаты по id
     final seen = <String>{excludeWord.id};
     final filtered = <Word>[];
     for (final w in pool) {
@@ -163,16 +198,20 @@ class DictionaryService extends ChangeNotifier {
     }
 
     filtered.shuffle(_random);
-    return filtered.take(count).toList();
+    final result = filtered.take(count).toList();
+    _log('getQuizOptions(): result=${result.length} (requested $count)');
+    return result;
   }
 
   /// Обновить кэш избранного после изменений в FavoritesService
   Future<void> refreshFavorites() async {
+    _log('refreshFavorites(): start');
     await _loadFavoritesIntoCache();
     if (selectedDictionaries.contains(favoritesFile)) {
       _rebuildActiveWords();
       notifyListeners();
     }
+    _log('refreshFavorites(): done; favWords=${_wordsCache[favoritesFile]?.length ?? 0}, active=${activeWords.length}');
   }
 
   // ---- Download dictionaries (remote-only) ----
@@ -183,28 +222,31 @@ class DictionaryService extends ChangeNotifier {
         String? indexUrl,
       }) async {
     if (indexUrl == null || indexUrl.isEmpty) {
-      return; // совместимость с существующими вызовами
+      _log('downloadAndSaveDictionaries(): no indexUrl -> return');
+      return;
     }
 
     isDownloading = true;
     downloadProgress = 0.0;
     statusMessage = 'downloading_dictionaries';
+    _log('downloadAndSaveDictionaries(): start; lang=$interfaceLanguage, url=$indexUrl');
     notifyListeners();
 
     try {
       final dir = await _dictionariesDir();
       await dir.create(recursive: true);
 
-      // Получаем и парсим индекс
+      _log('downloadAndSaveDictionaries(): fetching index...');
       final resp = await http.get(Uri.parse(indexUrl));
+      _log('downloadAndSaveDictionaries(): index status=${resp.statusCode}');
       if (resp.statusCode != 200) {
         throw Exception('Index download failed: ${resp.statusCode}');
       }
       final body = utf8.decode(resp.bodyBytes);
 
       final List<DictionaryInfo> list = _parseIndex(body);
+      _log('downloadAndSaveDictionaries(): parsed index -> ${list.length} items');
 
-      // Сохраняем индекс локально
       final indexFile = File('${dir.path}/index.json');
       await indexFile.writeAsString(jsonEncode(list
           .map((d) => {
@@ -215,8 +257,8 @@ class DictionaryService extends ChangeNotifier {
         'filePath': d.filePath,
       })
           .toList()));
+      _log('downloadAndSaveDictionaries(): index.json saved to ${indexFile.path}');
 
-      // Скачиваем каждый словарь (только http/https)
       int i = 0;
       for (final d in list) {
         i++;
@@ -224,69 +266,80 @@ class DictionaryService extends ChangeNotifier {
         notifyListeners();
 
         final target = File('${dir.path}/${d.file}');
+        _log('downloadAndSaveDictionaries(): [$i/${list.length}] fetching "${d.file}" from "${d.filePath}" -> ${target.path}');
         if (d.filePath.toLowerCase().startsWith('http')) {
           final r = await http.get(Uri.parse(d.filePath));
           if (r.statusCode == 200) {
             await target.writeAsBytes(r.bodyBytes);
+            _log('downloadAndSaveDictionaries(): saved ${d.file} (${r.bodyBytes.length} bytes)');
           } else {
-            // логировать при желании
+            _log('downloadAndSaveDictionaries(): SKIP ${d.file}, http ${r.statusCode}');
           }
+        } else {
+          _log('downloadAndSaveDictionaries(): SKIP ${d.file}, non-http path');
         }
       }
 
-      // Обновляем внутреннее состояние
+      _log('downloadAndSaveDictionaries(): refreshing internal state...');
       await _fetchAvailableDictionaries();
       _injectFavoritesIfMissing();
       await _ensureAllCachedLoaded();
+      await _loadFavoritesIntoCache();
       await _ensureWordsLoadedForSelection();
       _rebuildActiveWords();
 
       statusMessage = 'all_dictionaries_updated';
+      _log('downloadAndSaveDictionaries(): done; available=${availableDictionaries.length}, active=${activeWords.length}');
     } catch (e) {
       statusMessage = 'download_error';
+      _log('downloadAndSaveDictionaries(): ERROR $e');
       rethrow;
     } finally {
       isDownloading = false;
       downloadProgress = 0.0;
       notifyListeners();
+      _log('downloadAndSaveDictionaries(): finalize overlay -> isDownloading=false');
     }
   }
 
   // ---- Internals ----
 
   List<DictionaryInfo> _parseIndex(String body) {
-    // 1) Попробуем JSON
     try {
       final dynamic decoded = jsonDecode(body);
+      _log('_parseIndex(): JSON detected (${decoded.runtimeType})');
 
       if (decoded is List) {
-        return decoded.map<DictionaryInfo>((e) {
+        final res = decoded.map<DictionaryInfo>((e) {
           final m = Map<String, dynamic>.from(e as Map);
           return _dictFromAnyMap(m);
         }).toList();
+        _log('_parseIndex(): JSON list -> ${res.length}');
+        return res;
       }
 
       if (decoded is Map && decoded['dictionaries'] is List) {
         final list = (decoded['dictionaries'] as List);
-        return list.map<DictionaryInfo>((e) {
+        final res = list.map<DictionaryInfo>((e) {
           final m = Map<String, dynamic>.from(e as Map);
           return _dictFromAnyMap(m);
         }).toList();
+        _log('_parseIndex(): JSON map.dictionaries -> ${res.length}');
+        return res;
       }
-      // Если JSON, но формат неизвестен — провалимся в текстовый парсер ниже
+      _log('_parseIndex(): JSON format not recognized, try text lines');
     } catch (_) {
-      // не JSON — попробуем как текст
+      _log('_parseIndex(): not JSON, parse as text lines');
     }
 
-    // 2) Текстовый формат: построчно
     final result = <DictionaryInfo>[];
     final lines = const LineSplitter().convert(body);
+    _log('_parseIndex(): text lines=${lines.length}');
     for (var line in lines) {
       line = line.trim();
       if (line.isEmpty) continue;
       if (line.startsWith('#')) continue;
 
-      // поддержим запятая/точка с запятой/таб
       final parts = line
           .split(RegExp(r'\s*,\s*|\s*;\s*|\t'))
           .where((p) => p.isNotEmpty)
@@ -310,12 +363,10 @@ class DictionaryService extends ChangeNotifier {
 
       if (url == null || url.isEmpty) continue;
 
-      // если file отсутствует — вытащим из URL последний сегмент
       file ??= Uri.parse(url).pathSegments.isNotEmpty
           ? Uri.parse(url).pathSegments.last
           : 'dict_${result.length + 1}.json';
 
-      // уберём .json/.txt из базового имени
       final baseName =
       file.replaceAll(RegExp(r'\.(json|txt)$', caseSensitive: false), '');
       nameRu ??= baseName;
@@ -330,7 +381,7 @@ class DictionaryService extends ChangeNotifier {
         filePath: url,
       ));
     }
-
+    _log('_parseIndex(): text parsed -> ${result.length}');
     return result;
   }
 
@@ -338,19 +389,14 @@ class DictionaryService extends ChangeNotifier {
     String file = (m['file'] ?? m['filename'] ?? m['id'] ?? '').toString();
     String filePath = (m['filePath'] ?? m['url'] ?? m['href'] ?? '').toString();
 
-    // имена
     String nameRu =
-    (m['name_ru'] ?? m['ru'] ?? m['nameRu'] ?? m['title_ru'] ?? file)
-        .toString();
+    (m['name_ru'] ?? m['ru'] ?? m['nameRu'] ?? m['title_ru'] ?? file).toString();
     String nameEn =
-    (m['name_en'] ?? m['en'] ?? m['nameEn'] ?? m['title_en'] ?? file)
-        .toString();
+    (m['name_en'] ?? m['en'] ?? m['nameEn'] ?? m['title_en'] ?? file).toString();
     String nameEl =
-    (m['name_el'] ?? m['el'] ?? m['nameEl'] ?? m['title_el'] ?? file)
-        .toString();
+    (m['name_el'] ?? m['el'] ?? m['nameEl'] ?? m['title_el'] ?? file).toString();
 
     if (file.isEmpty) {
-      // если file не задан — вытащим из URL
       if (filePath.isNotEmpty) {
         final segs = Uri.parse(filePath).pathSegments;
         if (segs.isNotEmpty) file = segs.last;
@@ -374,27 +420,34 @@ class DictionaryService extends ChangeNotifier {
     );
   }
 
-  Future<void> _rebuildActiveWords() async {
+  void _rebuildActiveWords() {
     final List<Word> list = [];
     for (final id in selectedDictionaries) {
       final words = _wordsCache[id];
       if (words != null) list.addAll(words);
     }
     activeWords = list;
+    _log('_rebuildActiveWords(): selected=${selectedDictionaries.length}, active=${activeWords.length}');
   }
 
   Future<void> _ensureWordsLoadedForSelection() async {
+    _log('_ensureWordsLoadedForSelection(): selected=${selectedDictionaries.length}');
     if (selectedDictionaries.isEmpty) {
       activeWords = [];
+      _log('_ensureWordsLoadedForSelection(): no selection -> active cleared');
       return;
     }
     final dir = await _dictionariesDir();
     for (final id in selectedDictionaries) {
-      if (_wordsCache.containsKey(id)) continue;
+      if (_wordsCache.containsKey(id)) {
+        _log('_ensureWordsLoadedForSelection(): cache hit "$id" -> ${_wordsCache[id]?.length ?? 0}');
+        continue;
+      }
 
       if (id == favoritesFile) {
-        // особая загрузка избранного
+        _log('_ensureWordsLoadedForSelection(): load favorites "$favoritesFile"');
         await _loadFavoritesIntoCache();
+        _log('_ensureWordsLoadedForSelection(): favorites loaded -> ${_wordsCache[favoritesFile]?.length ?? 0}');
         continue;
       }
 
@@ -402,23 +455,27 @@ class DictionaryService extends ChangeNotifier {
       if (await file.exists()) {
         final list = await _readWordsListFromFile(file, id);
         _wordsCache[id] = list;
+        _log('_ensureWordsLoadedForSelection(): loaded "$id" -> ${list.length}');
       } else {
         _wordsCache[id] = const <Word>[];
+        _log('_ensureWordsLoadedForSelection(): file missing "$id" -> 0');
       }
     }
   }
 
-  /// Грузим **все** словари из папки в кэш (для режима "All words").
+  /// Грузим **все** словари из папки в кэш (для режима "All words"), КРОМЕ избранного.
   Future<void> _ensureAllCachedLoaded() async {
     final dir = await _dictionariesDir();
-    if (!await dir.exists()) return;
+    if (!await dir.exists()) {
+      _log('_ensureAllCachedLoaded(): dictionaries dir not exists');
+      return;
+    }
 
     final files = dir
         .listSync()
         .whereType<File>()
         .where((f) {
       final name = f.uri.pathSegments.last.toLowerCase();
-      // .json и .txt; исключаем служебные index/selected
       final isDataFile = name.endsWith('.json') || name.endsWith('.txt');
       final isService = name == 'index.json' ||
           name == 'selected.json' ||
@@ -428,20 +485,28 @@ class DictionaryService extends ChangeNotifier {
     })
         .toList();
 
+    _log('_ensureAllCachedLoaded(): files to consider=${files.length}');
+
     for (final f in files) {
-      final id = f.uri.pathSegments.last; // имя файла — наш dictionaryId
-      if (_wordsCache.containsKey(id)) continue;
+      final id = f.uri.pathSegments.last;
 
       if (id == favoritesFile) {
-        await _loadFavoritesIntoCache();
+        _log('_ensureAllCachedLoaded(): skip favorites "$id"');
+        continue; // важно: не трогаем избранное тут, чтобы не зациклиться
+      }
+
+      if (_wordsCache.containsKey(id)) {
+        _log('_ensureAllCachedLoaded(): cache hit "$id"');
         continue;
       }
 
       try {
         final list = await _readWordsListFromFile(f, id);
         _wordsCache[id] = list;
+        _log('_ensureAllCachedLoaded(): loaded "$id" -> ${list.length}');
       } catch (e) {
         _wordsCache[id] = const <Word>[];
+        _log('_ensureAllCachedLoaded(): ERROR loading "$id": $e');
       }
     }
   }
@@ -452,6 +517,7 @@ class DictionaryService extends ChangeNotifier {
     List<DictionaryInfo> list = [];
 
     if (await file.exists()) {
+      _log('_fetchAvailableDictionaries(): reading index.json');
       try {
         final raw = await file.readAsString();
         final decoded = jsonDecode(raw);
@@ -460,12 +526,14 @@ class DictionaryService extends ChangeNotifier {
               .map((e) => DictionaryInfo.fromJson(Map<String, dynamic>.from(e)))
               .toList()
               .cast<DictionaryInfo>();
+          _log('_fetchAvailableDictionaries(): index.json -> ${list.length}');
         }
-      } catch (_) {
+      } catch (e) {
+        _log('_fetchAvailableDictionaries(): ERROR parse index.json: $e');
         list = [];
       }
     } else {
-      // Fallback: просканировать папку на *.json и *.txt (кроме служебных)
+      _log('_fetchAvailableDictionaries(): index.json not found; scanning dir');
       if (await dir.exists()) {
         final entries = dir
             .listSync()
@@ -489,12 +557,16 @@ class DictionaryService extends ChangeNotifier {
             filePath: f.path,
           ));
         }
+        _log('_fetchAvailableDictionaries(): scan -> ${list.length}');
+      } else {
+        _log('_fetchAvailableDictionaries(): dictionaries dir missing');
       }
     }
 
     availableDictionaries = list;
-    _injectFavoritesIfMissing(); // гарантируем наличие избранного
+    _injectFavoritesIfMissing();
     _availableLoaded = true;
+    _log('_fetchAvailableDictionaries(): final available=${availableDictionaries.length}');
     notifyListeners();
   }
 
@@ -507,9 +579,12 @@ class DictionaryService extends ChangeNotifier {
         selectedDictionaries
           ..clear()
           ..addAll(list);
+        _log('_loadSelected(): loaded ${selectedDictionaries.length} items');
+      } else {
+        _log('_loadSelected(): selected.json not found');
       }
-    } catch (_) {
-      // ignore
+    } catch (e) {
+      _log('_loadSelected(): ERROR $e');
     }
   }
 
@@ -517,14 +592,16 @@ class DictionaryService extends ChangeNotifier {
     try {
       final file = await _selectedFile();
       await file.writeAsString(jsonEncode(selectedDictionaries.toList()));
-    } catch (_) {
-      // ignore
+      _log('_saveSelected(): saved ${selectedDictionaries.length} items');
+    } catch (e) {
+      _log('_saveSelected(): ERROR $e');
     }
   }
 
   Future<Directory> _dictionariesDir() async {
     final base = await getApplicationDocumentsDirectory();
-    return Directory('${base.path}/dictionaries');
+    final dir = Directory('${base.path}/dictionaries');
+    return dir;
   }
 
   Future<File> _selectedFile() async {
@@ -536,6 +613,7 @@ class DictionaryService extends ChangeNotifier {
   Future<void> _ensureDirs() async {
     final dir = await _dictionariesDir();
     await dir.create(recursive: true);
+    _log('_ensureDirs(): ensured ${dir.path}');
   }
 
   List<Word> _allCachedWords() {
@@ -544,14 +622,22 @@ class DictionaryService extends ChangeNotifier {
 
   /// Проверяем, что для каждого словаря из индекса файл реально существует.
   Future<bool> _allIndexedFilesPresent(List<DictionaryInfo> list) async {
-    if (list.isEmpty) return false;
+    if (list.isEmpty) {
+      _log('_allIndexedFilesPresent(): list is empty -> false');
+      return false;
+    }
     final dir = await _dictionariesDir();
     for (final d in list) {
       final f = File('${dir.path}/${d.file}');
-      if (!await f.exists()) {
+      final exists = await f.exists();
+      if (!exists) {
+        _log('_allIndexedFilesPresent(): missing file "${d.file}"');
         return false;
+      } else {
+        _log('_allIndexedFilesPresent(): present "${d.file}"');
       }
     }
+    _log('_allIndexedFilesPresent(): all present -> true');
     return true;
   }
 
@@ -560,11 +646,14 @@ class DictionaryService extends ChangeNotifier {
   Future<void> _ensureFavoritesFileExists() async {
     final dir = await _dictionariesDir();
     final favFile = File('${dir.path}/$favoritesFile');
-    if (await favFile.exists()) return;
+    if (await favFile.exists()) {
+      _log('_ensureFavoritesFileExists(): exists -> ${favFile.path}');
+      return;
+    }
 
-    // Создаём файл с форматом ids для совместимости с FavoritesService
     await favFile.create(recursive: true);
     await favFile.writeAsString(jsonEncode({'ids': <String>[]}));
+    _log('_ensureFavoritesFileExists(): created empty -> ${favFile.path}');
   }
 
   void _injectFavoritesIfMissing() {
@@ -576,101 +665,100 @@ class DictionaryService extends ChangeNotifier {
           nameRu: favoritesNameRu,
           nameEn: favoritesNameEn,
           nameEl: favoritesNameEl,
-          filePath: favoritesFile, // локальный файл
+          filePath: favoritesFile,
         ),
         ...availableDictionaries,
       ];
+      _log('_injectFavoritesIfMissing(): injected virtual dictionary "$favoritesFile"');
+    } else {
+      _log('_injectFavoritesIfMissing(): already present "$favoritesFile"');
     }
   }
 
-  /// Прочитать список слов из файла словаря (поддержка форматов):
-  ///  - JSON-массив: [ {...}, {...} ]
-  ///  - Объект с ключом "words": { "words": [ {...}, ... ] }
-  ///  - Для избранного возможен формат { "ids": [ "dictId|el", ... ] }
+  /// Прочитать список слов из файла словаря (несколько форматов)
   Future<List<Word>> _readWordsListFromFile(File f, String dictionaryId) async {
     final raw = await f.readAsString();
     final decoded = jsonDecode(raw);
 
-    // 1) массив объектов
     if (decoded is List) {
-      return decoded
+      final res = decoded
           .where((e) => e is Map)
           .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
           .toList();
+      _log('_readWordsListFromFile("$dictionaryId"): JSON list -> ${res.length}');
+      return res;
     }
 
-    // 2) объект с "words"
     if (decoded is Map && decoded['words'] is List) {
       final list = decoded['words'] as List;
-      return list
+      final res = list
           .where((e) => e is Map)
           .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), dictionaryId))
           .toList();
+      _log('_readWordsListFromFile("$dictionaryId"): JSON map.words -> ${res.length}');
+      return res;
     }
 
-    // 3) особый случай: избранное по "ids"
+    // избранное как словарь — обрабатывается отдельным методом, сюда обычно не попадём
     if (dictionaryId == favoritesFile && decoded is Map && decoded['ids'] is List) {
       final ids = (decoded['ids'] as List).whereType<String>().toList();
-      // убеждаемся, что весь пул слов загружен — будем матчить по Word.id
-      await _ensureAllCachedLoaded();
-      final all = _allCachedWords();
+      _log('_readWordsListFromFile("$dictionaryId"): ids format -> count=${ids.length}');
+      final all = _allCachedWords(); // только уже загруженные словари
       final byId = {for (final w in all) w.id: w};
-      return [
+      final res = <Word>[
         for (final id in ids)
           if (byId[id] != null) byId[id]!,
       ];
+      _log('_readWordsListFromFile("$dictionaryId"): resolved words -> ${res.length}');
+      return res;
     }
 
+    _log('_readWordsListFromFile("$dictionaryId"): unknown format -> 0');
     return const <Word>[];
   }
 
-  /// Загрузка favorites в кэш, с поддержкой всех форматов
+  /// Загрузка favorites в кэш, с поддержкой форматов и БЕЗ вызова _ensureAllCachedLoaded()
   Future<void> _loadFavoritesIntoCache() async {
     final dir = await _dictionariesDir();
     final favFile = File('${dir.path}/$favoritesFile');
     if (!await favFile.exists()) {
+      _log('_loadFavoritesIntoCache(): favorites file missing, creating...');
       await _ensureFavoritesFileExists();
     }
     try {
-      // Читаем файл и парсим
       final raw = await favFile.readAsString();
       final decoded = jsonDecode(raw);
 
-      // Обрабатываем формат с ids
       if (decoded is Map && decoded['ids'] is List) {
         final ids = (decoded['ids'] as List).whereType<String>().toList();
+        _log('_loadFavoritesIntoCache(): ids=${ids.length}');
 
-        // Убеждаемся, что все словари загружены
-        await _ensureAllCachedLoaded();
-
-        // Собираем слова по ID
+        // Резолвим ТОЛЬКО по уже загруженным словарям (без рекурсии)
         final all = _allCachedWords();
         final byId = {for (final w in all) w.id: w};
 
         final favoriteWords = <Word>[];
         for (final id in ids) {
-          if (byId[id] != null) {
-            favoriteWords.add(byId[id]!);
-          }
+          final w = byId[id];
+          if (w != null) favoriteWords.add(w);
         }
 
         _wordsCache[favoritesFile] = favoriteWords;
-      }
-      // Обрабатываем формат с words (старый формат)
-      else if (decoded is Map && decoded['words'] is List) {
+        _log('_loadFavoritesIntoCache(): cached favorites -> ${favoriteWords.length}');
+      } else if (decoded is Map && decoded['words'] is List) {
         final list = decoded['words'] as List;
         final words = list
             .where((e) => e is Map)
             .map((e) => Word.fromJson(Map<String, dynamic>.from(e as Map), favoritesFile))
             .toList();
         _wordsCache[favoritesFile] = words;
-      }
-      // Пустой массив слов по умолчанию
-      else {
+        _log('_loadFavoritesIntoCache(): cached favorites (words field) -> ${words.length}');
+      } else {
         _wordsCache[favoritesFile] = const <Word>[];
+        _log('_loadFavoritesIntoCache(): favorites unknown format -> 0');
       }
     } catch (e) {
-      debugPrint('[DictionaryService] Error loading favorites: $e');
+      _log('_loadFavoritesIntoCache(): ERROR $e');
       _wordsCache[favoritesFile] = const <Word>[];
     }
   }
